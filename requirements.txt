@@ -1,0 +1,22 @@
+# ACD ML Brain — Python Dependencies
+# Install with: pip install -r requirements.txt
+# GPU (NVIDIA): also run: pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# ── Core ML Stack ────────────────────────────────────────────────────────────
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.27.0
+peft>=0.10.0
+trl>=0.8.6
+bitsandbytes>=0.43.0
+
+# ── Data Handling ─────────────────────────────────────────────────────────────
+datasets>=2.19.0
+scikit-learn>=1.4.0
+
+# ── Schema Validation ─────────────────────────────────────────────────────────
+jsonschema>=4.21.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+sentencepiece>=0.2.0       # Required by some tokenizers
+protobuf>=4.25.0           # Required by Phi-3 tokenizer

@@ -1,0 +1,337 @@
+{
+  "version": "1.0",
+  "description": "QLoRA fine-tuning dataset for the ACD ML Brain. Each example is an input->output pair using the strict JSON schemas. The prompt field is what gets fed to the LLM. The completion field is the ideal structured response.",
+  "examples": [
+    {
+      "id": "train_001",
+      "input": {
+        "alert_id": "1a2b3c4d-0001-4000-a001-000000000001",
+        "timestamp": "2024-11-15T02:14:33Z",
+        "source_ip": "192.168.1.45",
+        "destination_ip": "10.0.0.2",
+        "destination_port": 5000,
+        "service": "auth_api",
+        "attack_type": "brute_force",
+        "severity": "high",
+        "raw_event_count": 312,
+        "features": {
+          "request_rate_per_min": 87.4,
+          "unique_paths_accessed": 1,
+          "failed_auth_count": 308,
+          "payload_contains_sql_keywords": false,
+          "user_agent_anomaly": true,
+          "geo_anomaly": false
+        },
+        "wazuh_rule_id": 5710,
+        "wazuh_rule_description": "sshd: brute force trying to get access to the system."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0001-4000-a001-000000000001",
+        "processed_at": "2024-11-15T02:14:35Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "brute_force",
+        "mitre_techniques": [
+          {"technique_id": "T1110.001", "technique_name": "Brute Force: Password Guessing", "tactic": "credential-access"},
+          {"technique_id": "T1078", "technique_name": "Valid Accounts", "tactic": "initial-access"}
+        ],
+        "confidence": 0.96,
+        "severity_assessment": "high",
+        "reasoning": "The alert shows 308 failed authentication attempts from a single IP (192.168.1.45) in a short window at a rate of 87.4 requests/min. The access is constrained to a single path (unique_paths_accessed=1), consistent with an automated credential-stuffing or dictionary attack on /login. The anomalous user-agent strongly suggests a scripted tool (e.g., Hydra, Medusa). No SQL keywords detected, ruling out injection. The service targeted is auth_api on port 5000, which directly controls system access. This pattern maps precisely to T1110.001. If successful, it would lead to T1078 (valid account compromise).",
+        "recommended_action": "block_ip",
+        "justification": "The volume (308 failures) and rate (87.4 req/min) from a single IP with a known-bad user agent constitutes a clear automated brute force attack. Blocking the source IP at the firewall level is the appropriate response to prevent credential compromise.",
+        "affected_services": ["auth_api"],
+        "propagation_risk": "high"
+      }
+    },
+    {
+      "id": "train_002",
+      "input": {
+        "alert_id": "1a2b3c4d-0002-4000-a002-000000000002",
+        "timestamp": "2024-11-15T09:41:07Z",
+        "source_ip": "10.0.0.88",
+        "destination_ip": "10.0.0.3",
+        "destination_port": 5001,
+        "service": "product_api",
+        "attack_type": "sql_injection",
+        "severity": "critical",
+        "raw_event_count": 23,
+        "features": {
+          "request_rate_per_min": 4.1,
+          "unique_paths_accessed": 3,
+          "failed_auth_count": 0,
+          "payload_contains_sql_keywords": true,
+          "user_agent_anomaly": false,
+          "geo_anomaly": false
+        },
+        "wazuh_rule_id": 31103,
+        "wazuh_rule_description": "Web attack detected: SQL injection attempt."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0002-4000-a002-000000000002",
+        "processed_at": "2024-11-15T09:41:09Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "sql_injection",
+        "mitre_techniques": [
+          {"technique_id": "T1190", "technique_name": "Exploit Public-Facing Application", "tactic": "initial-access"},
+          {"technique_id": "T1059", "technique_name": "Command and Scripting Interpreter", "tactic": "execution"},
+          {"technique_id": "T1005", "technique_name": "Data from Local System", "tactic": "collection"}
+        ],
+        "confidence": 0.94,
+        "severity_assessment": "critical",
+        "reasoning": "Despite a low request rate (4.1/min), SQL keywords were confirmed in request payloads against the product_api. The attacker is authenticated (0 auth failures) which suggests either a compromised account or an injection via an authenticated endpoint. The low rate is deliberate — a slow, evasive SQLi attack designed to avoid rate-limit triggers. Three different paths were probed, suggesting enumeration of query parameters across endpoints. This maps to T1190 for initial exploitation, T1059 for potential command execution via stacked queries, and T1005 for data extraction. The database service is at direct risk.",
+        "recommended_action": "isolate_service",
+        "justification": "Confirmed SQL injection with authenticated access requires immediate service isolation. The attacker may already have read database contents. Isolating product_api prevents further exfiltration while preserving forensic state. Rate-limiting alone is insufficient given the slow, evasive pattern.",
+        "affected_services": ["product_api", "database"],
+        "propagation_risk": "high"
+      }
+    },
+    {
+      "id": "train_003",
+      "input": {
+        "alert_id": "1a2b3c4d-0003-4000-a003-000000000003",
+        "timestamp": "2024-11-15T14:02:55Z",
+        "source_ip": "172.16.0.5",
+        "destination_ip": "10.0.0.1",
+        "destination_port": 80,
+        "service": "nginx",
+        "attack_type": "port_scan",
+        "severity": "medium",
+        "raw_event_count": 891,
+        "features": {
+          "request_rate_per_min": 215.0,
+          "unique_paths_accessed": 147,
+          "failed_auth_count": 0,
+          "payload_contains_sql_keywords": false,
+          "user_agent_anomaly": true,
+          "geo_anomaly": true
+        },
+        "wazuh_rule_id": 40101,
+        "wazuh_rule_description": "Web scanner activity detected."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0003-4000-a003-000000000003",
+        "processed_at": "2024-11-15T14:02:57Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "port_scan",
+        "mitre_techniques": [
+          {"technique_id": "T1595", "technique_name": "Active Scanning", "tactic": "reconnaissance"},
+          {"technique_id": "T1595.002", "technique_name": "Active Scanning: Vulnerability Scanning", "tactic": "reconnaissance"}
+        ],
+        "confidence": 0.91,
+        "severity_assessment": "medium",
+        "reasoning": "891 events across 147 unique paths at 215 req/min from an external IP (geo_anomaly=true) with an anomalous user-agent is a textbook web scanner signature. The breadth of path enumeration (147 unique paths) indicates vulnerability scanning, not brute force. No authentication attempts or SQL payloads were observed, confirming a pure reconnaissance phase. This is T1595 (Active Scanning) and more specifically T1595.002 (Vulnerability Scanning) — the attacker is mapping the attack surface before a follow-up intrusion attempt. This alert is a strong precursor indicator.",
+        "recommended_action": "rate_limit_ip",
+        "justification": "The attacker is in a reconnaissance phase — no active exploitation is occurring yet. Rate-limiting preserves the ability to analyze further traffic while slowing the scan. An immediate block could alert the attacker to start using proxies or botnets. The security team should be alerted to monitor for subsequent exploitation attempts.",
+        "affected_services": ["nginx"],
+        "propagation_risk": "medium"
+      }
+    },
+    {
+      "id": "train_004",
+      "input": {
+        "alert_id": "1a2b3c4d-0004-4000-a004-000000000004",
+        "timestamp": "2024-11-15T18:30:01Z",
+        "source_ip": "10.0.0.55",
+        "destination_ip": "10.0.0.2",
+        "destination_port": 5000,
+        "service": "auth_api",
+        "attack_type": "brute_force",
+        "severity": "medium",
+        "raw_event_count": 35,
+        "features": {
+          "request_rate_per_min": 2.1,
+          "unique_paths_accessed": 1,
+          "failed_auth_count": 33,
+          "payload_contains_sql_keywords": false,
+          "user_agent_anomaly": false,
+          "geo_anomaly": false
+        },
+        "wazuh_rule_id": 5710,
+        "wazuh_rule_description": "Multiple failed authentication attempts."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0004-4000-a004-000000000004",
+        "processed_at": "2024-11-15T18:30:03Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "brute_force",
+        "mitre_techniques": [
+          {"technique_id": "T1110.003", "technique_name": "Brute Force: Password Spraying", "tactic": "credential-access"}
+        ],
+        "confidence": 0.82,
+        "severity_assessment": "medium",
+        "reasoning": "33 failed auth attempts at a slow rate of 2.1 req/min from an internal IP (no geo_anomaly) with a normal user-agent. The low rate is deliberate to stay under lockout thresholds — this is password spraying (T1110.003) rather than raw brute force. The internal source IP suggests either a compromised internal host or a malicious insider. Normal user-agent may indicate use of legitimate tools (curl, Python requests) configured to mimic normal traffic.",
+        "recommended_action": "force_reauthentication",
+        "justification": "The slow, internal spray pattern doesn't warrant an IP block (could disrupt legitimate internal services) but does require forcing reauthentication and MFA challenges on the targeted accounts. The internal source should be flagged for investigation without immediate isolation.",
+        "affected_services": ["auth_api"],
+        "propagation_risk": "medium"
+      }
+    },
+    {
+      "id": "train_005",
+      "input": {
+        "alert_id": "1a2b3c4d-0005-4000-a005-000000000005",
+        "timestamp": "2024-11-16T00:05:22Z",
+        "source_ip": "203.0.113.77",
+        "destination_ip": "10.0.0.4",
+        "destination_port": 5432,
+        "service": "database",
+        "attack_type": "sql_injection",
+        "severity": "critical",
+        "raw_event_count": 7,
+        "features": {
+          "request_rate_per_min": 0.6,
+          "unique_paths_accessed": 2,
+          "failed_auth_count": 0,
+          "payload_contains_sql_keywords": true,
+          "user_agent_anomaly": true,
+          "geo_anomaly": true
+        },
+        "wazuh_rule_id": 31110,
+        "wazuh_rule_description": "Direct database connection from external IP with injection pattern."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0005-4000-a005-000000000005",
+        "processed_at": "2024-11-16T00:05:24Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "sql_injection",
+        "mitre_techniques": [
+          {"technique_id": "T1190", "technique_name": "Exploit Public-Facing Application", "tactic": "initial-access"},
+          {"technique_id": "T1041", "technique_name": "Exfiltration Over C2 Channel", "tactic": "exfiltration"},
+          {"technique_id": "T1027", "technique_name": "Obfuscated Files or Information", "tactic": "defense-evasion"}
+        ],
+        "confidence": 0.98,
+        "severity_assessment": "critical",
+        "reasoning": "An external IP (geo_anomaly=true) is directly accessing the database port (5432) with confirmed SQL injection payloads and an anomalous user-agent. Direct external access to the database port indicates a serious misconfiguration or firewall bypass. The extremely low rate (0.6 req/min) combined with T1027 indicators suggests an advanced attacker using time-delayed, obfuscated out-of-band injection to exfiltrate data covertly. This is one of the highest severity scenarios possible — a direct database breach with active exfiltration.",
+        "recommended_action": "isolate_service",
+        "justification": "Direct external database access is a critical incident. Immediate service isolation is required to stop exfiltration. This incident requires human escalation as it indicates a firewall policy failure and potential ongoing data breach. All database credentials must be rotated immediately.",
+        "affected_services": ["database", "product_api", "auth_api"],
+        "propagation_risk": "high"
+      }
+    },
+    {
+      "id": "train_006",
+      "input": {
+        "alert_id": "1a2b3c4d-0006-4000-a006-000000000006",
+        "timestamp": "2024-11-16T11:22:48Z",
+        "source_ip": "10.0.0.12",
+        "destination_ip": "10.0.0.2",
+        "destination_port": 5000,
+        "service": "auth_api",
+        "attack_type": "brute_force",
+        "severity": "low",
+        "raw_event_count": 6,
+        "features": {
+          "request_rate_per_min": 0.4,
+          "unique_paths_accessed": 1,
+          "failed_auth_count": 5,
+          "payload_contains_sql_keywords": false,
+          "user_agent_anomaly": false,
+          "geo_anomaly": false
+        },
+        "wazuh_rule_id": 5710,
+        "wazuh_rule_description": "Multiple failed authentication attempts."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0006-4000-a006-000000000006",
+        "processed_at": "2024-11-16T11:22:50Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "false_positive",
+        "mitre_techniques": [
+          {"technique_id": "T1110", "technique_name": "Brute Force", "tactic": "credential-access"}
+        ],
+        "confidence": 0.73,
+        "severity_assessment": "low",
+        "reasoning": "Only 5 failed auth attempts from an internal IP at a very low rate (0.4 req/min) with a normal user-agent and no geo-anomaly. This is consistent with a legitimate user who forgot their password. 5 failures is below the threshold for automated brute force (which typically shows 50+ in a short window). The internal source with no other anomaly indicators strongly suggests this is a false positive triggered by a low-sensitivity Wazuh rule. Classifying as false_positive with low confidence to flag for human review.",
+        "recommended_action": "alert_only",
+        "justification": "The evidence does not support an active attack. Only 5 failed attempts from an internal IP is within the range of normal user error. No action beyond logging is recommended. A human analyst should verify this was not a targeted low-effort attack.",
+        "affected_services": ["auth_api"],
+        "propagation_risk": "none"
+      }
+    },
+    {
+      "id": "train_007",
+      "input": {
+        "alert_id": "1a2b3c4d-0007-4000-a007-000000000007",
+        "timestamp": "2024-11-16T15:55:03Z",
+        "source_ip": "198.51.100.23",
+        "destination_ip": "10.0.0.1",
+        "destination_port": 80,
+        "service": "nginx",
+        "attack_type": "port_scan",
+        "severity": "high",
+        "raw_event_count": 2340,
+        "features": {
+          "request_rate_per_min": 780.0,
+          "unique_paths_accessed": 412,
+          "failed_auth_count": 0,
+          "payload_contains_sql_keywords": false,
+          "user_agent_anomaly": true,
+          "geo_anomaly": true
+        },
+        "wazuh_rule_id": 40101,
+        "wazuh_rule_description": "High-volume web scanner activity detected."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0007-4000-a007-000000000007",
+        "processed_at": "2024-11-16T15:55:05Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "port_scan",
+        "mitre_techniques": [
+          {"technique_id": "T1595", "technique_name": "Active Scanning", "tactic": "reconnaissance"},
+          {"technique_id": "T1595.001", "technique_name": "Active Scanning: Scanning IP Blocks", "tactic": "reconnaissance"},
+          {"technique_id": "T1595.002", "technique_name": "Active Scanning: Vulnerability Scanning", "tactic": "reconnaissance"},
+          {"technique_id": "T1499", "technique_name": "Endpoint Denial of Service", "tactic": "impact"}
+        ],
+        "confidence": 0.97,
+        "severity_assessment": "high",
+        "reasoning": "Extremely high-volume scan: 2340 events, 412 unique paths, 780 req/min. At this rate, the scan itself constitutes a denial-of-service risk (T1499) in addition to reconnaissance. The external geo-anomaly IP with a known-malicious user-agent signature points to an automated scanner (e.g., masscan, nuclei). The scope of 412 paths suggests a full vulnerability scan including common CVE checks, admin panels, and default credentials. The scale escalates the severity from medium to high.",
+        "recommended_action": "block_ip",
+        "justification": "The scan volume (780 req/min) is large enough to degrade service performance for legitimate users. Combined with the clearly malicious intent (external IP, anomalous UA, 412 paths), an immediate IP block is justified to prevent both DoS impact and subsequent exploitation from the reconnaissance data gathered.",
+        "affected_services": ["nginx"],
+        "propagation_risk": "medium"
+      }
+    },
+    {
+      "id": "train_008",
+      "input": {
+        "alert_id": "1a2b3c4d-0008-4000-a008-000000000008",
+        "timestamp": "2024-11-17T03:10:19Z",
+        "source_ip": "10.0.0.77",
+        "destination_ip": "10.0.0.3",
+        "destination_port": 5001,
+        "service": "product_api",
+        "attack_type": "sql_injection",
+        "severity": "high",
+        "raw_event_count": 51,
+        "features": {
+          "request_rate_per_min": 12.3,
+          "unique_paths_accessed": 8,
+          "failed_auth_count": 0,
+          "payload_contains_sql_keywords": true,
+          "user_agent_anomaly": false,
+          "geo_anomaly": false
+        },
+        "wazuh_rule_id": 31103,
+        "wazuh_rule_description": "SQL injection pattern in request body."
+      },
+      "output": {
+        "alert_id": "1a2b3c4d-0008-4000-a008-000000000008",
+        "processed_at": "2024-11-17T03:10:21Z",
+        "model_version": "phi3-mini-acd-v1.0",
+        "attack_type_confirmed": "sql_injection",
+        "mitre_techniques": [
+          {"technique_id": "T1190", "technique_name": "Exploit Public-Facing Application", "tactic": "initial-access"},
+          {"technique_id": "T1005", "technique_name": "Data from Local System", "tactic": "collection"},
+          {"technique_id": "T1027", "technique_name": "Obfuscated Files or Information", "tactic": "defense-evasion"}
+        ],
+        "confidence": 0.89,
+        "severity_assessment": "high",
+        "reasoning": "Confirmed SQL keywords in payloads across 8 different endpoints at a moderate rate of 12.3 req/min from an internal IP with a normal user-agent. The internal origin with no auth failures suggests a compromised microservice or insider threat performing systematic injection across multiple API endpoints. The moderate rate across multiple paths is consistent with sqlmap-style automated injection discovery. The database is at risk of full enumeration.",
+        "recommended_action": "escalate_to_human",
+        "justification": "An internal authenticated source performing SQL injection across multiple endpoints is a high-confidence insider threat or compromised internal service scenario. Automated isolation may disrupt legitimate operations. Human analyst review is required to determine whether this is a rogue internal service, a compromised container, or a penetration test.",
+        "affected_services": ["product_api", "database"],
+        "propagation_risk": "high"
+      }
+    }
+  ]
+}

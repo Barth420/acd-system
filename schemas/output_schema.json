@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MLReasoningResult",
+  "description": "Output produced by the ML Brain module. Consumed by downstream response/orchestration systems.",
+  "type": "object",
+  "required": [
+    "alert_id",
+    "processed_at",
+    "model_version",
+    "attack_type_confirmed",
+    "mitre_techniques",
+    "confidence",
+    "severity_assessment",
+    "reasoning",
+    "recommended_action",
+    "justification",
+    "affected_services",
+    "propagation_risk"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "alert_id": {
+      "type": "string",
+      "description": "Echo of the input alert_id for traceability.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when the ML module processed this alert."
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Identifier of the fine-tuned model that produced this output.",
+      "example": "phi3-mini-acd-v1.0"
+    },
+    "attack_type_confirmed": {
+      "type": "string",
+      "enum": ["brute_force", "sql_injection", "port_scan", "xss", "unknown", "false_positive"],
+      "description": "Model's confirmed classification. May differ from pipeline's initial detection."
+    },
+    "mitre_techniques": {
+      "type": "array",
+      "description": "List of MITRE ATT&CK techniques this attack maps to.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["technique_id", "technique_name", "tactic"],
+        "additionalProperties": false,
+        "properties": {
+          "technique_id": {
+            "type": "string",
+            "pattern": "^T\\d{4}(\\.\\d{3})?$",
+            "example": "T1110.001"
+          },
+          "technique_name": {
+            "type": "string",
+            "example": "Brute Force: Password Guessing"
+          },
+          "tactic": {
+            "type": "string",
+            "enum": [
+              "reconnaissance",
+              "resource-development",
+              "initial-access",
+              "execution",
+              "persistence",
+              "privilege-escalation",
+              "defense-evasion",
+              "credential-access",
+              "discovery",
+              "lateral-movement",
+              "collection",
+              "command-and-control",
+              "exfiltration",
+              "impact"
+            ]
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Model confidence in its classification and recommendation. 0.0 = no confidence, 1.0 = certain."
+    },
+    "severity_assessment": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Model's own severity assessment, informed by context and propagation risk."
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "Step-by-step reasoning chain produced by the model explaining WHY this classification was made.",
+      "minLength": 50
+    },
+    "recommended_action": {
+      "type": "string",
+      "enum": [
+        "block_ip",
+        "rate_limit_ip",
+        "alert_only",
+        "isolate_service",
+        "force_reauthentication",
+        "patch_and_restart",
+        "escalate_to_human",
+        "no_action"
+      ],
+      "description": "Concrete defensive action the system should take."
+    },
+    "justification": {
+      "type": "string",
+      "description": "One to three sentences justifying the recommended_action in plain English.",
+      "minLength": 20
+    },
+    "affected_services": {
+      "type": "array",
+      "description": "List of microservices that are currently or potentially affected.",
+      "items": {
+        "type": "string",
+        "enum": ["auth_api", "product_api", "database", "nginx", "unknown"]
+      }
+    },
+    "propagation_risk": {
+      "type": "string",
+      "enum": ["none", "low", "medium", "high"],
+      "description": "Estimated risk that this attack can spread to other services if not contained."
+    }
+  }
+}

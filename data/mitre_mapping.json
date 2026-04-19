@@ -1,0 +1,161 @@
+{
+  "version": "1.0",
+  "description": "MITRE ATT&CK technique mapping for ACD system attack types. Used by the ML brain to annotate outputs with standardized technique IDs.",
+  "techniques": [
+    {
+      "technique_id": "T1595",
+      "technique_name": "Active Scanning",
+      "tactic": "reconnaissance",
+      "attack_types": ["port_scan"],
+      "description": "Adversaries actively probe victim infrastructure via network scanning.",
+      "indicators": [
+        "High unique ports probed",
+        "ICMP/SYN flood patterns",
+        "Sequential IP/port enumeration"
+      ]
+    },
+    {
+      "technique_id": "T1595.001",
+      "technique_name": "Active Scanning: Scanning IP Blocks",
+      "tactic": "reconnaissance",
+      "attack_types": ["port_scan"],
+      "description": "Scanning ranges of IP addresses to identify live hosts.",
+      "indicators": [
+        "Multiple destination IPs from same source",
+        "Low TTL variation",
+        "nmap-like fingerprint patterns"
+      ]
+    },
+    {
+      "technique_id": "T1595.002",
+      "technique_name": "Active Scanning: Vulnerability Scanning",
+      "tactic": "reconnaissance",
+      "attack_types": ["port_scan"],
+      "description": "Scanning to find vulnerable software versions or misconfigurations.",
+      "indicators": [
+        "Known scanner user-agents (nikto, masscan)",
+        "Version banner grabbing requests",
+        "Probing of default service paths"
+      ]
+    },
+    {
+      "technique_id": "T1110",
+      "technique_name": "Brute Force",
+      "tactic": "credential-access",
+      "attack_types": ["brute_force"],
+      "description": "Attempting to gain access by systematically trying all possible passwords.",
+      "indicators": [
+        "High failed_auth_count",
+        "Rapid sequential login attempts",
+        "Single source IP, multiple credentials"
+      ]
+    },
+    {
+      "technique_id": "T1110.001",
+      "technique_name": "Brute Force: Password Guessing",
+      "tactic": "credential-access",
+      "attack_types": ["brute_force"],
+      "description": "Guessing passwords without prior knowledge of the account.",
+      "indicators": [
+        "Common password list patterns",
+        "High request_rate_per_min on /login endpoints",
+        "Consistent source IP"
+      ]
+    },
+    {
+      "technique_id": "T1110.003",
+      "technique_name": "Brute Force: Password Spraying",
+      "tactic": "credential-access",
+      "attack_types": ["brute_force"],
+      "description": "Using a few common passwords across many accounts to avoid lockouts.",
+      "indicators": [
+        "Multiple usernames, few password attempts each",
+        "Rate below lockout threshold",
+        "Distributed timing pattern"
+      ]
+    },
+    {
+      "technique_id": "T1078",
+      "technique_name": "Valid Accounts",
+      "tactic": "initial-access",
+      "attack_types": ["brute_force"],
+      "description": "Using compromised credentials to access systems.",
+      "indicators": [
+        "Successful login after many failures",
+        "Login from anomalous geo_anomaly=true IP",
+        "Unusual session duration post-login"
+      ]
+    },
+    {
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public-Facing Application",
+      "tactic": "initial-access",
+      "attack_types": ["sql_injection", "xss"],
+      "description": "Exploiting vulnerabilities in public-facing web applications.",
+      "indicators": [
+        "payload_contains_sql_keywords=true",
+        "Error-based SQLi patterns in responses",
+        "Unusual query parameters"
+      ]
+    },
+    {
+      "technique_id": "T1059",
+      "technique_name": "Command and Scripting Interpreter",
+      "tactic": "execution",
+      "attack_types": ["sql_injection"],
+      "description": "Executing commands via a scripting interpreter, e.g., OS commands via SQLi.",
+      "indicators": [
+        "UNION SELECT payloads",
+        "xp_cmdshell or EXEC patterns",
+        "Stacked query patterns (;DROP TABLE)"
+      ]
+    },
+    {
+      "technique_id": "T1005",
+      "technique_name": "Data from Local System",
+      "tactic": "collection",
+      "attack_types": ["sql_injection"],
+      "description": "Exfiltrating data from the database via injection.",
+      "indicators": [
+        "INFORMATION_SCHEMA queries",
+        "Bulk SELECT patterns",
+        "Unusually large response payloads"
+      ]
+    },
+    {
+      "technique_id": "T1041",
+      "technique_name": "Exfiltration Over C2 Channel",
+      "tactic": "exfiltration",
+      "attack_types": ["sql_injection"],
+      "description": "Data exfiltrated through a covert channel established by SQLi.",
+      "indicators": [
+        "Out-of-band SQLi patterns (DNS/HTTP callbacks)",
+        "Large outbound data transfers post-injection"
+      ]
+    },
+    {
+      "technique_id": "T1499",
+      "technique_name": "Endpoint Denial of Service",
+      "tactic": "impact",
+      "attack_types": ["port_scan", "brute_force"],
+      "description": "Flooding endpoints causing service unavailability.",
+      "indicators": [
+        "request_rate_per_min > 500",
+        "Service response degradation",
+        "Saturated connection pool"
+      ]
+    },
+    {
+      "technique_id": "T1027",
+      "technique_name": "Obfuscated Files or Information",
+      "tactic": "defense-evasion",
+      "attack_types": ["sql_injection", "xss"],
+      "description": "Encoding or obfuscating payloads to evade detection.",
+      "indicators": [
+        "URL-encoded SQLi payloads (%27 = ')",
+        "Base64-encoded script tags",
+        "Comment injection in SQL (/**/)"
+      ]
+    }
+  ]
+}

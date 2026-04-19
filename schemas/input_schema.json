@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NormalizedAlert",
+  "description": "Normalized alert produced by Bhavya's ingestion pipeline. This is the ONLY valid input format for the ML Brain module.",
+  "type": "object",
+  "required": [
+    "alert_id",
+    "timestamp",
+    "source_ip",
+    "destination_ip",
+    "destination_port",
+    "service",
+    "attack_type",
+    "severity",
+    "raw_event_count",
+    "features"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "alert_id": {
+      "type": "string",
+      "description": "UUID v4 — unique identifier for this alert event.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of the alert.",
+      "example": "2024-11-15T08:23:11Z"
+    },
+    "source_ip": {
+      "type": "string",
+      "description": "IPv4 address of the suspected attacker.",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$"
+    },
+    "destination_ip": {
+      "type": "string",
+      "description": "IPv4 address of the target service.",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$"
+    },
+    "destination_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "Port of the targeted service."
+    },
+    "service": {
+      "type": "string",
+      "enum": ["auth_api", "product_api", "database", "nginx", "unknown"],
+      "description": "Which microservice was targeted. Must match Docker service names."
+    },
+    "attack_type": {
+      "type": "string",
+      "enum": ["brute_force", "sql_injection", "port_scan", "xss", "unknown"],
+      "description": "Classification of the detected attack vector."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Severity level derived by the ingestion pipeline."
+    },
+    "raw_event_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of raw SIEM events that were aggregated into this alert."
+    },
+    "features": {
+      "type": "object",
+      "description": "Normalized numeric/boolean features extracted from raw events for ML consumption.",
+      "required": [
+        "request_rate_per_min",
+        "unique_paths_accessed",
+        "failed_auth_count",
+        "payload_contains_sql_keywords",
+        "user_agent_anomaly",
+        "geo_anomaly"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "request_rate_per_min": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Requests per minute from source IP to this service."
+        },
+        "unique_paths_accessed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of distinct URL paths accessed in this session."
+        },
+        "failed_auth_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed authentication attempts in the window."
+        },
+        "payload_contains_sql_keywords": {
+          "type": "boolean",
+          "description": "Whether any request payload matched SQL injection keyword patterns."
+        },
+        "user_agent_anomaly": {
+          "type": "boolean",
+          "description": "Whether the User-Agent header was absent, malformed, or known-malicious."
+        },
+        "geo_anomaly": {
+          "type": "boolean",
+          "description": "Whether source IP geo-location deviates from baseline."
+        }
+      }
+    },
+    "wazuh_rule_id": {
+      "type": ["integer", "null"],
+      "description": "Optional: Original Wazuh rule ID that triggered this alert.",
+      "example": 5710
+    },
+    "wazuh_rule_description": {
+      "type": ["string", "null"],
+      "description": "Optional: Human-readable Wazuh rule description.",
+      "example": "sshd: brute force trying to get access to the system."
+    }
+  }
+}
