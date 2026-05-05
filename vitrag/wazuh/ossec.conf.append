@@ -1,0 +1,25 @@
+<!--
+Append this block to ossec.conf so Wazuh Manager monitors our app logs.
+The shared volume `shared_logs` is mounted into the manager at /mnt/app_logs (read-only).
+-->
+<ossec_config>
+
+  <!-- auth_api logs -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/mnt/app_logs/auth/auth.log</location>
+  </localfile>
+
+  <!-- product_api logs -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/mnt/app_logs/product/product.log</location>
+  </localfile>
+
+  <!-- nginx access log -->
+  <localfile>
+    <log_format>apache</log_format>
+    <location>/mnt/app_logs/nginx/access.log</location>
+  </localfile>
+
+</ossec_config>

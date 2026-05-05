@@ -1,0 +1,215 @@
+# ACD Phase 1 — Vitrag's Lab
+#
+# 4-container vulnerable microservice setup + Wazuh SIEM (single-node).
+#
+# Services:
+#   nginx        — reverse proxy / frontend (port 80)
+#   auth_api     — vulnerable login service (port 5000)
+#   product_api  — vulnerable product catalog (port 5001)
+#   database     — Postgres with weak config (port 5432)
+#
+# Wazuh stack (sebp-style single-node):
+#   wazuh.manager   — alerting engine (port 1514, 1515, 55000)
+#   wazuh.indexer   — OpenSearch (port 9200)
+#   wazuh.dashboard — UI (port 5601)
+#
+# Plus:
+#   forwarder    — tails Wazuh alerts.json and POSTs to Bhavya's pipeline
+#
+# Bring it all up:  docker compose up -d
+# Tear it down:     docker compose down -v
+
+name: acd-phase1
+
+networks:
+  acd-net:
+    driver: bridge
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  wazuh_indexer_data:
+  pg_data:
+  shared_logs:    # Shared volume so Wazuh agent can read app logs
+
+services:
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Vulnerable application stack
+  # ────────────────────────────────────────────────────────────────────────
+
+  database:
+    image: postgres:16-alpine
+    container_name: acd-database
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: weakpass123        # intentionally weak
+      POSTGRES_DB: acd_lab
+    ports:
+      - "5432:5432"                          # exposed on purpose
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./lab/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - acd-net
+    restart: unless-stopped
+
+  auth_api:
+    build: ./lab/auth_api
+    container_name: acd-auth-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - shared_logs:/var/log
+    networks:
+      - acd-net
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  product_api:
+    build: ./lab/product_api
+    container_name: acd-product-api
+    ports:
+      - "5001:5001"
+    volumes:
+      - shared_logs:/var/log
+    networks:
+      - acd-net
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: acd-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./lab/frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - shared_logs:/var/log
+    networks:
+      - acd-net
+    depends_on:
+      - auth_api
+      - product_api
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Wazuh SIEM (single-node, official images)
+  # ────────────────────────────────────────────────────────────────────────
+
+  wazuh.manager:
+    image: wazuh/wazuh-manager:4.7.5
+    container_name: acd-wazuh-manager
+    hostname: wazuh.manager
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655360
+        hard: 655360
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - shared_logs:/mnt/app_logs:ro    # Read app logs to monitor
+      - ./wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml:ro
+      - ./wazuh/ossec.conf.append:/wazuh-config-mount/etc/ossec.conf.append:ro
+    networks:
+      - acd-net
+
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:4.7.5
+    container_name: acd-wazuh-indexer
+    hostname: wazuh.indexer
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+    networks:
+      - acd-net
+
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:4.7.5
+    container_name: acd-wazuh-dashboard
+    hostname: wazuh.dashboard
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=kibanaserver
+    depends_on:
+      - wazuh.indexer
+    networks:
+      - acd-net
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Forwarder — Wazuh alerts → Bhavya's pipeline
+  # ────────────────────────────────────────────────────────────────────────
+
+  forwarder:
+    build: ./forwarder
+    container_name: acd-forwarder
+    environment:
+      # Bhavya's pipeline runs on the host (not in this compose).
+      # On WSL2 / Docker Desktop, host.docker.internal resolves the host.
+      - BHAVYA_API=http://host.docker.internal:8000/alerts
+      - WAZUH_ALERTS_PATH=/wazuh-logs/alerts/alerts.json
+    volumes:
+      - wazuh_logs:/wazuh-logs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux/WSL2 compatibility
+    depends_on:
+      - wazuh.manager
+    networks:
+      - acd-net
+    restart: unless-stopped
