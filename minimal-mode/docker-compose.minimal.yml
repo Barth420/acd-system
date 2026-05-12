@@ -1,0 +1,114 @@
+# ACD Phase 1 — MINIMAL MODE
+#
+# Like vitrag/docker-compose.yml but WITHOUT Wazuh.
+# Reuses all the lab service definitions from vitrag/lab/.
+#
+# Use this when:
+#   - You can't download Wazuh's ~1.5 GB of images
+#   - You just want to demo the end-to-end pipeline quickly
+#
+# Run from the repo root:
+#   docker compose -f minimal-mode/docker-compose.minimal.yml up -d --build
+# Down:
+#   docker compose -f minimal-mode/docker-compose.minimal.yml down -v
+
+name: acd-phase1-minimal
+
+networks:
+  acd-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  shared_logs:
+
+services:
+
+  database:
+    image: postgres:16-alpine
+    container_name: acd-database
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: weakpass123
+      POSTGRES_DB: acd_lab
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ../vitrag/lab/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - acd-net
+    restart: unless-stopped
+
+  auth_api:
+    build: ../vitrag/lab/auth_api
+    container_name: acd-auth-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - shared_logs:/var/log
+    networks:
+      - acd-net
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  product_api:
+    build: ../vitrag/lab/product_api
+    container_name: acd-product-api
+    ports:
+      - "5001:5001"
+    volumes:
+      - shared_logs:/var/log
+    networks:
+      - acd-net
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: acd-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ../vitrag/lab/frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - shared_logs:/var/log
+    # Override entrypoint so we can replace the symlinked log file with a real
+    # one (default nginx image symlinks /var/log/nginx/access.log to /dev/stdout,
+    # which the forwarder can't tail).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        rm -f /var/log/nginx/access.log /var/log/nginx/error.log
+        mkdir -p /var/log/nginx
+        touch /var/log/nginx/access.log /var/log/nginx/error.log
+        exec nginx -g 'daemon off;'
+    networks:
+      - acd-net
+    depends_on:
+      - auth_api
+      - product_api
+    restart: unless-stopped
+
+  log_forwarder:
+    build: ./forwarder_minimal
+    container_name: acd-log-forwarder
+    environment:
+      - BHAVYA_API=http://host.docker.internal:8000/alerts
+      - BHAVYA_HEALTHZ=http://host.docker.internal:8000/healthz
+      - AUTH_LOG=/shared_logs/auth/auth.log
+      - PRODUCT_LOG=/shared_logs/product/product.log
+      - NGINX_LOG=/shared_logs/nginx/access.log
+    volumes:
+      - shared_logs:/shared_logs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - auth_api
+      - product_api
+      - nginx
+    networks:
+      - acd-net
+    restart: unless-stopped
