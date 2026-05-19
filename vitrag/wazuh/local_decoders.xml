@@ -1,0 +1,32 @@
+<!--
+ACD Lab — Custom decoders for Flask app log format.
+Line format: YYYY-MM-DD HH:MM:SS,mmm LEVEL [program] MESSAGE
+-->
+
+<!-- auth_api failure: AUTH_FAILURE user=<u> src_ip=<ip> ua=<ua> reason=... -->
+<decoder name="acd_auth_failure">
+  <prematch>AUTH_FAILURE user=</prematch>
+  <regex>AUTH_FAILURE user=(\S+) src_ip=(\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<!-- auth_api success: AUTH_SUCCESS user=<u> src_ip=<ip> ... -->
+<decoder name="acd_auth_success">
+  <prematch>AUTH_SUCCESS user=</prematch>
+  <regex>AUTH_SUCCESS user=(\S+) src_ip=(\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<!-- product_api SQL injection / error -->
+<decoder name="acd_product_sqli">
+  <prematch>SQL_ERROR|SQLI_ATTEMPT</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<!-- product_api XSS attempt -->
+<decoder name="acd_product_xss">
+  <prematch>XSS_ATTEMPT</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>

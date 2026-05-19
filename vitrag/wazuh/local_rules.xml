@@ -1,38 +1,30 @@
-<!--
-ACD Phase 1 — Custom Wazuh rules.
-
-These rules fire on patterns from auth_api, product_api, and nginx logs.
-They use rule_id ranges that Bhavya's normalizer already understands:
-  5710-5720  → brute_force
-  31100-31199 → web attacks (SQL injection / XSS)
-  40100-40110 → port scans
-
-Rule levels:
-  level 5  → low
-  level 8  → medium
-  level 10 → high
-  level 12 → critical
--->
 <group name="acd_lab,authentication_failures,">
 
-  <!-- 5710-5712: Auth API brute force detection -->
-  <rule id="5710" level="5">
-    <decoded_as>json</decoded_as>
-    <match>AUTH_FAILURE</match>
+  <!--
+    ACD auth_api brute-force rules.
+    IDs 100710-100712 avoid conflicts with Wazuh's built-in SSH rules (5710-5712).
+    No <if_sid> — atomic rules that fire purely on decoder match,
+    independent of built-in syslog rule 1002 ('failure' substring).
+  -->
+
+  <rule id="100710" level="5">
+    <decoded_as>acd_auth_failure</decoded_as>
     <description>auth_api: Failed login attempt.</description>
     <group>authentication_failed,</group>
   </rule>
 
-  <rule id="5711" level="10" frequency="5" timeframe="60">
-    <if_matched_sid>5710</if_matched_sid>
-    <same_source_ip />
-    <description>auth_api: Multiple failed logins from same source IP (possible brute force).</description>
+  <!-- Brute force: 5 failures from same IP in 60 s -->
+  <rule id="100711" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>100710</if_matched_sid>
+    <same_srcip/>
+    <description>auth_api: Multiple failed logins from same IP (brute force).</description>
     <group>authentication_failures,brute_force,</group>
   </rule>
 
-  <rule id="5712" level="12" frequency="20" timeframe="120">
-    <if_matched_sid>5710</if_matched_sid>
-    <same_source_ip />
+  <!-- Sustained brute force: 20 failures from same IP in 120 s -->
+  <rule id="100712" level="12" frequency="20" timeframe="120">
+    <if_matched_sid>100710</if_matched_sid>
+    <same_srcip/>
     <description>auth_api: Sustained brute force attack from single IP.</description>
     <group>authentication_failures,brute_force,attack,</group>
   </rule>
@@ -41,17 +33,28 @@ Rule levels:
 
 <group name="acd_lab,web,attack,">
 
-  <!-- 31103: SQL injection signatures in product_api logs -->
-  <rule id="31103" level="11">
-    <match>SQL_ERROR|union.*select|or.*1=1|--|information_schema|sqlmap</match>
+  <!--
+    ACD web attack rules.
+    IDs 100103/100105/100106 avoid conflicts with built-in web rules (31103/31105/31106).
+  -->
+
+  <rule id="100103" level="11">
+    <decoded_as>acd_product_sqli</decoded_as>
     <description>Web attack: SQL injection attempt detected.</description>
     <group>web_attack,sql_injection,attack,</group>
   </rule>
 
-  <!-- 31105: XSS signatures -->
-  <rule id="31105" level="9">
+  <rule id="100105" level="9">
+    <decoded_as>acd_product_xss</decoded_as>
     <match>&lt;script|javascript:|onerror=|onload=</match>
     <description>Web attack: XSS attempt detected.</description>
+    <group>web_attack,xss,attack,</group>
+  </rule>
+
+  <rule id="100106" level="9">
+    <decoded_as>acd_product_xss</decoded_as>
+    <match>%3Cscript|%3cscript|%3CSCRIPT</match>
+    <description>Web attack: URL-encoded XSS attempt detected.</description>
     <group>web_attack,xss,attack,</group>
   </rule>
 
@@ -59,16 +62,20 @@ Rule levels:
 
 <group name="acd_lab,recon,">
 
-  <!-- 40101: Port scan / nmap signatures from nginx access log -->
-  <rule id="40101" level="8">
+  <!--
+    ACD recon rules.
+    IDs 100201/100202 avoid conflicts with built-in attack rules (40101/40102).
+  -->
+
+  <rule id="100201" level="8">
     <match>nmap|masscan|Nikto|sqlmap</match>
-    <description>Reconnaissance tool signature in User-Agent (port scan / vuln scanner).</description>
+    <description>Reconnaissance tool signature detected.</description>
     <group>recon,port_scan,attack,</group>
   </rule>
 
-  <rule id="40102" level="10" frequency="50" timeframe="30">
-    <if_matched_sid>40101</if_matched_sid>
-    <same_source_ip />
+  <rule id="100202" level="10" frequency="50" timeframe="30">
+    <if_matched_sid>100201</if_matched_sid>
+    <same_srcip/>
     <description>Sustained reconnaissance from single IP.</description>
     <group>recon,port_scan,attack,</group>
   </rule>
