@@ -11,7 +11,7 @@ from collections import deque
 
 from flask import g, jsonify, request
 
-from svc.acdlib import Service, make_db
+from svc.acdlib import Service, clean, make_db
 
 svc = Service("queue")
 items: deque = deque(maxlen=1000)
@@ -38,7 +38,7 @@ def stats():
 
 @svc.route("/admin/config", caps=("dynamic_query",))
 def admin_config():
-    svc.say(f"ADMIN_ACCESS route=/admin/config src_ip={g.src_ip} caller={g.caller}")
+    svc.say(f"ADMIN_ACCESS route=/admin/config src_ip={g.src_ip} caller={clean(g.caller)}")
     return jsonify({"worker_db_user": WORKER_USER, "worker_db_password": WORKER_PASSWORD, "db_host": "database"})
 
 
@@ -48,7 +48,7 @@ def admin_db_query():
     if d.get("password") != WORKER_PASSWORD:
         return jsonify({"error": "bad worker password"}), 401
     sql = str(d.get("sql", "SELECT 1"))
-    svc.say(f"LATERAL_DB_ACCESS db_user={WORKER_USER} src_ip={g.src_ip} caller={g.caller} source_service=queue target=database")
+    svc.say(f"LATERAL_DB_ACCESS db_user={WORKER_USER} src_ip={g.src_ip} caller={clean(g.caller)} source_service=queue target=database")
     rows = db.raw(sql, limit=20)
     return jsonify({"rows": [list(map(str, r)) for r in rows]})
 

@@ -39,3 +39,32 @@
     so one broken hop does not mark every service on the path as down. `overall_availability` is the mean of the four journey
     rates (login, search, product_view, place_order). The health endpoint runs a probe round itself if none has run yet, so it
     never reports a number it has not measured.
+
+## V4: forwarder, alert sink, Wazuh
+14. Reused from 54e6deb / 7d5be0a: `<rule_dir>etc/rules</rule_dir>` in ossec.conf (copied verbatim), the 100xxx id range, atomic
+    decoder-triggered rules without `<if_sid>1</if_sid>`, the four `acd_*` decoders (unchanged: services keep the log prefixes
+    and only append `rid=`), `start-wazuh.sh` (copied; container names, compose dir and the forwarder swap changed), the
+    docker-cp of ossec.conf into the `wazuh_etc` volume, the certificate bind mounts and `securityadmin`. Changed or added:
+    three decoders (`acd_cred_reuse`, `acd_lateral`, `acd_exfil`) and a last-resort `acd_service_line` decoder (any line with
+    `src_ip=` yields srcip); rules 100301-100303; localfile entries for order/search/queue logs; 100712 listed BEFORE 100711 so the
+    sustained-brute-force rule is reachable (the old order let the 5-event rule always win); recon rules listed last.
+15. Contract D ambiguity, resolved by me, **CONFIRM**: the contract calls 100105 "SQL injection (aggregated)" and 100106 "XSS", but
+    the existing local_rules.xml has 100105 = XSS and 100106 = URL-encoded XSS. In the hierarchy rule set 100105 is aggregated
+    SQLi (5 x 100103 from one source in 30 s) at **level 12** (the old file's level 9 would put the aggregate below the single
+    event) and 100106 is XSS at level 9. The old lab's file is untouched.
+16. 100302 ("unauthorized internal admin access") is emitted for `LATERAL_DB_ACCESS` (queue's worker account used against the
+    database). The auth_api `ADMIN_ACCESS` line is informational only: alerting on it would add a second, misleading alert to every
+    credential-reuse event. 100301 covers `CREDENTIAL_REUSE`, `DEPENDENCY_ABUSE` and `SESSION_REUSE`; 100303 covers `DATA_EXFIL`
+    (>= 50 rows in one answer). `dstport` is the logging service's container port, except 100302/100303 where the data lives in the
+    database (5432); `source_service` is always the service that logged the line (contract D).
+17. Parity between the Python forwarder and the Wazuh rules is checked by `tests/wazuh_eval.py`, a small evaluator of the XML subset
+    used here, replaying synthetic sequences and one log written by the real services. **This checks the two rule sets in this repo
+    agree; it is not Wazuh.** Unverified against a real manager: whether `frequency="5"` fires on the 5th or the 6th event, and
+    first-match ordering of sibling rules. Wazuh itself has never been run in this session.
+18. Log injection: every caller-controlled identifier (username, X-Service-Name, source address) is passed through `clean()` before it
+    is logged, and the forwarder takes the LAST `rid=` in a line, so attacker text cannot forge a source address or request id in an
+    alert. The user agent is logged `repr`-quoted and is still carried in alerts as data (it is the S6 injection carrier).
+19. The forwarder posts to the alert sink and (best effort) the pipeline at `host.docker.internal:8000`; `--sink-only` runs without the
+    pipeline. With `--wazuh`, `up.sh` stops the log forwarder and `forwarder-wazuh` (tails Wazuh's alerts.json, adds request id,
+    source_service and dstport from the alert's `location` / `full_log`) takes over, so alerts are not duplicated. The Wazuh dashboard
+    is published on 127.0.0.1:5601 under the profile only (a deviation from "only three published ports", needed to use it).

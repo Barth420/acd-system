@@ -27,6 +27,18 @@ volumes:
   control:
   app_logs:
   pg_data:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  wazuh_indexer_data:
 
 services:
   database:
@@ -108,3 +120,114 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock        # needed for `docker network disconnect` and the gateway reload.
                                                           # This is root-level control of Docker: acceptable for a local lab ONLY.
     networks: [ ctl_net, net_t0, net_t1, net_t2 ]
+
+  alert-sink:                                           # stand-in for the pipeline's /alerts (run without the pipeline)
+    build: { context: ., dockerfile: tools/Dockerfile }
+    image: acd-h-alert-sink:latest
+    container_name: acd-h-alert-sink
+    restart: unless-stopped
+    mem_limit: 96m
+    ports: [ "127.0.0.1:8099:8099" ]
+    networks: [ ctl_net ]
+
+  forwarder:                                            # tails the shared logs; posts to the sink and (best effort) the pipeline
+    build: { context: ., dockerfile: forwarder/Dockerfile }
+    image: acd-h-forwarder:latest
+    container_name: acd-h-forwarder
+    restart: unless-stopped
+    mem_limit: 96m
+    environment:
+      LOG_ROOT: /var/log/acd
+      ALERT_URLS: "http://alert-sink:8099/alerts,http://host.docker.internal:8000/alerts"
+    extra_hosts: [ "host.docker.internal:host-gateway" ]
+    volumes: [ "app_logs:/var/log/acd:ro" ]
+    networks: [ ctl_net ]
+    depends_on: [ alert-sink ]
+
+  # ---- Wazuh (profile `wazuh`; default stack runs without it; needs ~3 GB RAM). Patterns copied from vitrag/docker-compose.yml ----
+  wazuh.manager:
+    profiles: [ wazuh ]
+    image: wazuh/wazuh-manager:4.7.5
+    container_name: acd-h-wazuh-manager
+    hostname: wazuh.manager
+    restart: unless-stopped
+    ulimits: { memlock: { soft: -1, hard: -1 }, nofile: { soft: 655360, hard: 655360 } }
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - ../wazuh-certificates/root-ca.pem:/etc/ssl/root-ca.pem:ro
+      - ../wazuh-certificates/wazuh.manager.pem:/etc/ssl/filebeat.pem:ro
+      - ../wazuh-certificates/wazuh.manager-key.pem:/etc/ssl/filebeat.key:ro
+      - app_logs:/mnt/app_logs:ro
+      - ./wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml:ro
+      - ./wazuh/local_decoders.xml:/var/ossec/etc/decoders/local_decoders.xml:ro
+      - ./wazuh/ossec.conf:/var/ossec/etc/ossec.conf:ro      # shadowed by the wazuh_etc volume: scripts/start-wazuh.sh docker-cps it
+    networks: [ ctl_net ]
+
+  wazuh.indexer:
+    profiles: [ wazuh ]
+    image: wazuh/wazuh-indexer:4.7.5
+    container_name: acd-h-wazuh-indexer
+    hostname: wazuh.indexer
+    restart: unless-stopped
+    environment: [ "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g" ]
+    ulimits: { memlock: { soft: -1, hard: -1 }, nofile: { soft: 65536, hard: 65536 } }
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+      - ../wazuh-certificates/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/indexer.pem:ro
+      - ../wazuh-certificates/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/indexer-key.pem:ro
+      - ../wazuh-certificates/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem:ro
+      - ../wazuh-certificates/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem:ro
+      - ../wazuh-certificates/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem:ro
+    networks: [ ctl_net ]
+
+  wazuh.dashboard:
+    profiles: [ wazuh ]
+    image: wazuh/wazuh-dashboard:4.7.5
+    container_name: acd-h-wazuh-dashboard
+    hostname: wazuh.dashboard
+    restart: unless-stopped
+    ports: [ "127.0.0.1:5601:5601" ]
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=kibanaserver
+    depends_on: [ wazuh.indexer ]
+    networks: [ ctl_net ]
+
+  forwarder-wazuh:                                      # replaces `forwarder` when the wazuh profile is used (start-wazuh.sh stops it)
+    profiles: [ wazuh ]
+    build: { context: ., dockerfile: forwarder/Dockerfile }
+    image: acd-h-forwarder:latest
+    container_name: acd-h-forwarder-wazuh
+    restart: unless-stopped
+    mem_limit: 96m
+    environment:
+      FORWARDER_SOURCE: wazuh
+      WAZUH_ALERTS_PATH: /wazuh-logs/alerts/alerts.json
+      ALERT_URLS: "http://alert-sink:8099/alerts,http://host.docker.internal:8000/alerts"
+    extra_hosts: [ "host.docker.internal:host-gateway" ]
+    volumes: [ "wazuh_logs:/wazuh-logs:ro" ]
+    networks: [ ctl_net ]
+    depends_on: [ wazuh.manager, alert-sink ]

@@ -12,7 +12,7 @@ import time
 
 from flask import g, jsonify, request
 
-from svc.acdlib import Service, blocked, make_cache, make_db, service_key_ok, EXFIL_ROWS
+from svc.acdlib import Service, blocked, clean, make_cache, make_db, service_key_ok, EXFIL_ROWS
 
 svc = Service("auth_api")
 db, cache = make_db(), make_cache()
@@ -31,9 +31,9 @@ def login():
     if rows and rows[0][0] == pw:
         tok = f"tok_{user}_{secrets.token_hex(4)}"
         cache.set(f"sess:{tok}", json.dumps({"user": user, "ip": g.src_ip, "ts": time.time()}), ex=3600)
-        svc.say(f"AUTH_SUCCESS user={user} src_ip={g.src_ip} ua={g.ua!r}")
+        svc.say(f"AUTH_SUCCESS user={clean(user)} src_ip={g.src_ip} ua={g.ua!r}")
         return jsonify({"status": "ok", "token": tok})
-    svc.say(f"AUTH_FAILURE user={user} src_ip={g.src_ip} ua={g.ua!r} reason=invalid_credentials")
+    svc.say(f"AUTH_FAILURE user={clean(user)} src_ip={g.src_ip} ua={g.ua!r} reason=invalid_credentials")
     return jsonify({"status": "error", "msg": "invalid credentials"}), 401
 
 
@@ -53,7 +53,7 @@ def whoami():
 def _service_auth():
     ok, why = service_key_ok(svc, request.headers.get("X-Service-Name"), request.headers.get("X-Service-Key"))
     if not ok:
-        svc.say(f"CREDENTIAL_REJECTED service={request.headers.get('X-Service-Name')} src_ip={g.src_ip} reason={why}")
+        svc.say(f"CREDENTIAL_REJECTED service={clean(request.headers.get('X-Service-Name'))} src_ip={g.src_ip} reason={why}")
         return jsonify({"error": "bad service credentials", "reason": why}), 401
     return None
 
@@ -71,7 +71,7 @@ def validate():
 
 
 def _admin_audit(route: str) -> None:
-    caller = request.headers.get("X-Service-Name")
+    caller = clean(request.headers.get("X-Service-Name"))
     if g.via_gateway:  # a service key presented through the public gateway, not from inside the lab
         svc.say(f"CREDENTIAL_REUSE service={caller} src_ip={g.src_ip} route={route} via=gateway")
     svc.say(f"ADMIN_ACCESS service={caller} src_ip={g.src_ip} route={route} via={'gateway' if g.via_gateway else 'internal'}")

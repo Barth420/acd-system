@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -40,6 +41,11 @@ BULK_ROWS = int(os.getenv("BULK_ROWS", "20"))          # more rows than this in 
 EXFIL_ROWS = int(os.getenv("EXFIL_ROWS", "50"))        # volume anomaly threshold that logs DATA_EXFIL
 RL_RATE = float(os.getenv("RL_RATE", "8"))             # rate_limited: requests/s per source ...
 RL_BURST = float(os.getenv("RL_BURST", "10"))          # ... with this burst
+
+
+def clean(v, n: int = 64) -> str:
+    """Make a caller-supplied identifier safe for a one-line log record (no spaces, '=' or quotes: no field spoofing)."""
+    return re.sub(r"[^\w.:/@-]", "_", str(v))[:n]
 
 
 class UpstreamError(Exception):
@@ -222,7 +228,7 @@ class Service:
         def _ctx():
             g.rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16]
             fwd = request.headers.get("X-Forwarded-For", "")
-            g.src_ip = fwd.split(",")[0].strip() or request.remote_addr or "0.0.0.0"
+            g.src_ip = clean(fwd.split(",")[0].strip() or request.remote_addr or "0.0.0.0", 45)
             g.via_gateway = request.headers.get("X-Via-Gateway") == "1"
             g.caller = request.headers.get("X-Service-Name")
             g.ua = request.headers.get("User-Agent", "")
