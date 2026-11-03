@@ -4,10 +4,19 @@ Everything is under `vitrag/hierarchy/`. The old 4-service lab (`vitrag/docker-c
 same time (it publishes host ports 5002 and 8080); `scripts/up.sh` refuses to start while project `acd-phase1` or
 `acd-phase1-minimal` is up.
 
-> **Verification status.** The build sandbox had no Docker daemon. The Python code (services, controller, forwarder, sink, console)
-> is tested as real processes via `scripts/local_stack.py`. The compose file is validated statically (`docker compose config`).
-> **Not run anywhere yet:** the containers/Dockerfiles, the nginx config, `docker network disconnect`, the tier networks, and Wazuh.
-> Run `scripts/smoke.sh` on a machine with Docker before trusting them.
+> **Verification status.** The build sandbox had no Docker daemon, so the Python code (services, controller,
+> forwarder, sink, console) was first tested as real processes via `scripts/local_stack.py`, and the compose file
+> only statically (`docker compose config`). **Since then, `scripts/smoke.sh` has been run successfully against
+> the real stack on Docker Desktop + WSL2**: all 8 containers build and start, every service answers `/healthz`,
+> request IDs propagate through every real hop (gateway → order_api → queue, confirmed in the containers' own
+> logs), and the database is confirmed unreachable from the gateway container (tier isolation holds at the
+> network level, not just in app code). Two real bugs only surfaced this way and are now fixed: an nginx config
+> syntax error (`add_header` inside a bare `if`), and a Docker Desktop/WSL2 single-file bind-mount quirk — see
+> `DECISIONS.md` #25-26.
+>
+> **Still not exercised against real Docker:** `docker network disconnect` actually firing on `isolated` (V2),
+> the attack scenarios running through the real attacker containers rather than the local-process fallback (V3),
+> and Wazuh (the `wazuh` profile). If you run any of those, let the maintainers know how it goes.
 
 ## Run it
 
