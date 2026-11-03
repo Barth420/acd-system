@@ -94,3 +94,17 @@ services:
     # wait for the controller to write the first generated include, then run in the foreground
     entrypoint: [ "/bin/sh", "-c", "mkdir -p /var/log/acd/nginx; until [ -f /control/gateway_http.conf ]; do sleep 1; done; exec nginx -g 'daemon off;'" ]
     networks: [ attacker_net, net_t0 ]
+
+  controller:
+    build: { context: ., dockerfile: controller/Dockerfile }
+    image: acd-h-controller:latest
+    container_name: acd-h-controller
+    restart: unless-stopped
+    mem_limit: 128m
+    ports: [ "127.0.0.1:8100:8100" ]                    # controller API + lab console (/ui)
+    environment: { CONTROL_STATE: /control/state.json, GATEWAY_URL: "http://nginx:80" }
+    volumes:
+      - control:/control                                  # the only writer of the control state
+      - /var/run/docker.sock:/var/run/docker.sock        # needed for `docker network disconnect` and the gateway reload.
+                                                          # This is root-level control of Docker: acceptable for a local lab ONLY.
+    networks: [ ctl_net, net_t0, net_t1, net_t2 ]

@@ -29,6 +29,9 @@ def test_data_tier_is_never_published_and_published_ports_are_localhost_only():
         for p in s.get("ports", []):
             assert str(p).startswith("127.0.0.1:"), (name, p)
     assert SVCS["nginx"]["ports"] == ["127.0.0.1:8080:80"]
+    assert SVCS["controller"]["ports"] == ["127.0.0.1:8100:8100"]
+    published = {n for n, s in SVCS.items() if s.get("ports")}
+    assert published <= {"nginx", "controller", "alert-sink"}               # contract A: nothing else reaches the host
 
 
 def test_tier_networks_are_internal_and_data_tier_is_isolated_from_the_edge():
