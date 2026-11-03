@@ -114,12 +114,38 @@ services:
     restart: unless-stopped
     mem_limit: 128m
     ports: [ "127.0.0.1:8100:8100" ]                    # controller API + lab console (/ui)
-    environment: { CONTROL_STATE: /control/state.json, GATEWAY_URL: "http://nginx:80" }
+    environment:
+      CONTROL_STATE: /control/state.json
+      GATEWAY_URL: "http://nginx:80"
+      SINK_URL: "http://alert-sink:8099"
+      ATTACKER_URLS: "attacker-1=http://attacker-1:7000,attacker-2=http://attacker-2:7000"
     volumes:
       - control:/control                                  # the only writer of the control state
       - /var/run/docker.sock:/var/run/docker.sock        # needed for `docker network disconnect` and the gateway reload.
                                                           # This is root-level control of Docker: acceptable for a local lab ONLY.
     networks: [ ctl_net, net_t0, net_t1, net_t2 ]
+
+  attacker-1:                                           # V3: distinct IP, driven by the controller via POST /execute
+    build: { context: ., dockerfile: attacker/Dockerfile }
+    image: acd-h-attacker:latest
+    container_name: acd-h-attacker-1
+    restart: unless-stopped
+    mem_limit: 64m
+    environment: { AGENT_NAME: attacker-1 }
+    networks:
+      ctl_net: {}
+      attacker_net: { ipv4_address: 172.30.9.10 }
+
+  attacker-2:
+    build: { context: ., dockerfile: attacker/Dockerfile }
+    image: acd-h-attacker:latest
+    container_name: acd-h-attacker-2
+    restart: unless-stopped
+    mem_limit: 64m
+    environment: { AGENT_NAME: attacker-2 }
+    networks:
+      ctl_net: {}
+      attacker_net: { ipv4_address: 172.30.9.11 }
 
   alert-sink:                                           # stand-in for the pipeline's /alerts (run without the pipeline)
     build: { context: ., dockerfile: tools/Dockerfile }

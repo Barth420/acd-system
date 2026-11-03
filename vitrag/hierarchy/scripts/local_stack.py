@@ -97,6 +97,7 @@ class LocalStack:
         port = free_port()
         env = {**os.environ, "PYTHONPATH": f"{HIER / 'shared'}:{HIER}", "CONTROL_STATE": str(self.control), "GATEWAY_URL": self.gateway,
                "ACD_DOCKER": "off", "ACD_NO_INFRA_PROBE": "1", "LOG_ROOT": str(self.logs),
+               "ACD_ATTACKER_BIND": "127.0.0.2,127.0.0.3", "SINK_URL": "http://127.0.0.1:1",
                "ALERT_URLS": os.getenv("ALERT_URLS", ""), **{f"SERVICE_URL_{s.upper()}": self.url(s) for s in MODULES}}
         self.procs.append(subprocess.Popen([sys.executable, "-m", "uvicorn", "controller.app:app", "--port", str(port), "--log-level", "warning"],
                                            cwd=HIER, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))

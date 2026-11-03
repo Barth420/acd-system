@@ -117,6 +117,27 @@ def create_app(lab: Optional[Lab] = None) -> FastAPI:
     def health():
         return L().health()
 
+    @app.get("/scenarios")
+    def scenarios():
+        return L().list_scenarios()
+
+    @app.post("/scenarios/{sid}/run")
+    def run_scenario(sid: str, body: SeedBody = SeedBody(), x_actor: str = Header("unknown")):
+        run_id = L().run_scenario(sid, body.seed, x_actor)
+        return {"run_id": run_id}
+
+    @app.get("/runs/{run_id}")
+    def get_run(run_id: str):
+        return L().get_run(run_id)
+
+    @app.get("/runs/{run_id}/ground-truth")
+    def get_ground_truth(run_id: str):
+        return L().get_ground_truth(run_id)
+
+    @app.post("/runs/{run_id}/stop")
+    def stop_run(run_id: str, x_actor: str = Header("unknown")):
+        return L().stop_run(run_id, x_actor)
+
     @app.get("/actions")
     def actions():
         return list(L().actions)

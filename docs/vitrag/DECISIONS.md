@@ -68,3 +68,34 @@
     pipeline. With `--wazuh`, `up.sh` stops the log forwarder and `forwarder-wazuh` (tails Wazuh's alerts.json, adds request id,
     source_service and dstport from the alert's `location` / `full_log`) takes over, so alerts are not duplicated. The Wazuh dashboard
     is published on 127.0.0.1:5601 under the profile only (a deviation from "only three published ports", needed to use it).
+
+## V3: attack scenarios
+20. Attacker identity: real containers (`attacker-1` 172.30.9.10, `attacker-2` 172.30.9.11 on `attacker_net`, controlled
+    by the controller via `POST /execute`) in Docker. For no-Docker testing, `controller/attackers.py` falls back to
+    in-process `DirectClient`s bound to `127.0.0.2`/`127.0.0.3` — genuinely distinct source addresses (the whole
+    `127.0.0.0/8` range is loopback on Linux), not a label. All scenario steps go through the public gateway only,
+    including the ones the brief called "internal routes" (`/orders/debug/forward`, `/auth/admin/*`): these are
+    internal/admin *routes*, reachable via the gateway, not container-network-internal addresses — matches "attacks
+    run only against this local lab; bind to localhost and the docker networks."
+21. Outcome judging (see `controller/scenarios.py` module docstring and `docs/vitrag/SCENARIOS.md`): blocked only on an
+    observed `X-ACD-Blocked` header or a connection failure the state snapshot explains as isolation; otherwise each
+    step's own `validate()` decides succeeded vs failed from the real response (a login returning a token, an export
+    returning ≥50 rows, a non-empty row list) — a wrong password guess is `failed`, not `succeeded`, and never
+    assumed compromised.
+22. `target_service` in a ground-truth step names the asset the step's intent targets (e.g. "database" for a dump
+    delivered through product_api or auth_api), not necessarily the literal HTTP endpoint, so `compromised_services`
+    reads the way contract E's own example does. `blocked_by.service` on an edge cut names the CALLER whose outbound
+    edge was cut (`X-ACD-Service`, set by `acdlib.dep_call`), consistent with V1/V2 — found and documented, not
+    changed, while writing V3 tests.
+23. Bugs found only by running real scenarios against the real stack (not assumed from reading the code): (a) the
+    attacker client's 4000-character response-body cap silently truncated large bulk-dump JSON, which made a
+    genuinely successful 300-row export validate as "failed" — raised to 500 KB; (b) `aux["service_key"]` called
+    `Lab.state.get()` as if `state` were the `StateReader` used elsewhere, but `Lab.state` is the live dict —
+    fixed. Both are now exercised by `test_s2_sqli_credential_reuse_database_dump` and
+    `test_s3_scan_sqli_exfiltration`.
+24. S6 is built so both its steps always resolve to `failed`: the point is that instruction-injection text in a
+    username/User-Agent, and a forged POST straight to the alert sink impersonating Wazuh, have no real effect on
+    the lab — not to simulate an attack that "works."
+25. Seeds (`random.Random(seed)`) control step-timing jitter only (0.05-1.8 s ranges, chosen by me, not measured);
+    the attack logic and payloads are fixed per scenario. `test_seed_controls_jitter_deterministically` checks same
+    seed -> same timing and outcomes.

@@ -20,8 +20,10 @@ import requests
 
 import controlstate as cs
 import gateway_rules as gr
+from controller.attackers import AgentClient, DirectClient, make_attackers
 from controller.dockerops import NullDockerOps
 from controller.probes import JOURNEYS, Prober, run_journey
+from controller.scenarios import SCENARIOS, ScenarioRunner
 
 
 class LabError(Exception):
@@ -93,7 +95,8 @@ class TrafficGen:
 class Lab:
     def __init__(self, control_path: str | os.PathLike, gateway_url: str, docker: Optional[NullDockerOps] = None,
                  direct: Optional[Callable[[str], Optional[bool]]] = None, probe: bool = True, probe_interval: float = 2.0,
-                 gateway_conf_path: Optional[str | os.PathLike] = None):
+                 gateway_conf_path: Optional[str | os.PathLike] = None, attackers: Optional[dict[str, Any]] = None,
+                 sink_url: Optional[str] = None):
         self.control_path = Path(control_path)
         self.gateway_conf_path = Path(gateway_conf_path) if gateway_conf_path else self.control_path.parent / "gateway_http.conf"
         self.actions_path = self.control_path.parent / "actions.jsonl"
@@ -107,6 +110,9 @@ class Lab:
         self.prober = Prober(gateway_url, direct, probe_interval)
         self.traffic = TrafficGen(gateway_url)
         self.runs: dict[str, Any] = {}                     # scenario runs (V3)
+        self.attackers = attackers or make_attackers()
+        self.sink_url = sink_url or os.getenv("SINK_URL", "http://alert-sink:8099")
+        self.scenario_runner = ScenarioRunner(self)
         if probe:
             self.prober.start()
 
@@ -227,6 +233,44 @@ class Lab:
 
     def health(self) -> dict[str, Any]:
         return self.prober.health()
+
+    # -- scenarios (V3) -----------------------------------------------------
+    def list_scenarios(self) -> list[dict[str, Any]]:
+        return [{"id": k, "name": v["name"], "description": v["description"]} for k, v in SCENARIOS.items()]
+
+    def run_scenario(self, scenario_id: str, seed: Optional[int], actor: str = "unknown") -> str:
+        def go():
+            try:
+                run = self.scenario_runner.start(scenario_id, seed)
+            except KeyError:
+                raise LabError(f"unknown scenario {scenario_id!r}", 404)
+            with self.lock:
+                self.runs[run["run_id"]] = run
+            return run["run_id"]
+        return self._guard(actor, "run_scenario", {"scenario_id": scenario_id, "seed": seed}, go)
+
+    def get_run(self, run_id: str) -> dict[str, Any]:
+        run = self.runs.get(run_id)
+        if run is None:
+            raise LabError(f"unknown run {run_id!r}", 404)
+        return {"status": run["status"], "scenario_id": run["scenario_id"], "started_at": run["started_at"], "ended_at": run["ended_at"]}
+
+    def get_ground_truth(self, run_id: str) -> dict[str, Any]:
+        run = self.runs.get(run_id)
+        if run is None:
+            raise LabError(f"unknown run {run_id!r}", 404)
+        with self.lock:
+            import copy
+            return copy.deepcopy(run["gt"])
+
+    def stop_run(self, run_id: str, actor: str = "unknown") -> dict[str, Any]:
+        def go():
+            run = self.runs.get(run_id)
+            if run is None:
+                raise LabError(f"unknown run {run_id!r}", 404)
+            run["stop"].set()
+            return {"ok": True}
+        return self._guard(actor, "stop_run", {"run_id": run_id}, go)
 
     def close(self) -> None:
         self.prober.stop()
