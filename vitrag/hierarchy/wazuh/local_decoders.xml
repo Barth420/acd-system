@@ -1,0 +1,58 @@
+<!--
+Hierarchy lab decoders. The first four are the ones from vitrag/wazuh/local_decoders.xml, unchanged (the services keep
+those log prefixes and only append rid=<request id>). The last three are new, for the events added with the hierarchy.
+Line format: YYYY-MM-DD HH:MM:SS,mmm LEVEL [program] MESSAGE rid=<id>
+-->
+
+<decoder name="acd_auth_failure">
+  <prematch>AUTH_FAILURE user=</prematch>
+  <regex>AUTH_FAILURE user=(\S+) src_ip=(\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<decoder name="acd_auth_success">
+  <prematch>AUTH_SUCCESS user=</prematch>
+  <regex>AUTH_SUCCESS user=(\S+) src_ip=(\S+)</regex>
+  <order>user, srcip</order>
+</decoder>
+
+<decoder name="acd_product_sqli">
+  <prematch>SQL_ERROR|SQLI_ATTEMPT</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<decoder name="acd_product_xss">
+  <prematch>XSS_ATTEMPT</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<!-- NEW: credential reuse / dependency abuse / replayed session (auth_api, order_api) -->
+<decoder name="acd_cred_reuse">
+  <prematch>CREDENTIAL_REUSE|DEPENDENCY_ABUSE|SESSION_REUSE</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<!-- NEW: queue worker account used against the database -->
+<decoder name="acd_lateral">
+  <prematch>LATERAL_DB_ACCESS</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<!-- NEW: bulk read volume anomaly (auth_api export, product_api bulk result) -->
+<decoder name="acd_exfil">
+  <prematch>DATA_EXFIL</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>
+
+<!-- NEW (last on purpose: decoders are tried in file order): any other service line still yields srcip, so source-based
+     rules such as the reconnaissance signature (100201) can group by source. -->
+<decoder name="acd_service_line">
+  <prematch>src_ip=</prematch>
+  <regex>src_ip=(\S+)</regex>
+  <order>srcip</order>
+</decoder>

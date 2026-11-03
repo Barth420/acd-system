@@ -1,0 +1,6 @@
+# vitrag-local ignores (the root .gitignore is not edited by this track)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+hierarchy/.run/

@@ -1,0 +1,78 @@
+<!--
+Hierarchy lab rules, ids in the 100xxx custom range (see commit 54e6deb: built-in ids 5710-5712, 31103, 31105, 40101-40102
+are taken by Wazuh's own ruleset and silently override custom rules). All decoder-triggered rules are atomic (no <if_sid>1</if_sid>)
+so built-in rule 1002 cannot intercept them. ORDER MATTERS and is mirrored by forwarder/rules.py: first matching top-level
+rule wins; a frequency child replaces its parent once it has seen `frequency` same-source events inside `timeframe`.
+Changes from vitrag/wazuh/local_rules.xml: 100712 is listed BEFORE 100711 (so the specific rule is reachable); 100105 is now the
+aggregated SQL injection rule and 100106 the XSS rule (contract D); new rules 100301-100303; recon rules moved last.
+-->
+<group name="acd_lab,authentication_failures,">
+  <rule id="100710" level="5">
+    <decoded_as>acd_auth_failure</decoded_as>
+    <description>auth_api: Failed login attempt.</description>
+    <group>authentication_failed,</group>
+  </rule>
+  <rule id="100712" level="12" frequency="20" timeframe="120">
+    <if_matched_sid>100710</if_matched_sid>
+    <same_srcip/>
+    <description>auth_api: Sustained brute force attack from single IP.</description>
+    <group>authentication_failures,brute_force,attack,</group>
+  </rule>
+  <rule id="100711" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>100710</if_matched_sid>
+    <same_srcip/>
+    <description>auth_api: Multiple failed logins from same IP (brute force).</description>
+    <group>authentication_failures,brute_force,</group>
+  </rule>
+</group>
+
+<group name="acd_lab,web,attack,">
+  <rule id="100103" level="11">
+    <decoded_as>acd_product_sqli</decoded_as>
+    <description>Web attack: SQL injection attempt detected.</description>
+    <group>web_attack,sql_injection,attack,</group>
+  </rule>
+  <rule id="100105" level="12" frequency="5" timeframe="30">
+    <if_matched_sid>100103</if_matched_sid>
+    <same_srcip/>
+    <description>Web attack: repeated SQL injection attempts from single IP.</description>
+    <group>web_attack,sql_injection,attack,</group>
+  </rule>
+  <rule id="100106" level="9">
+    <decoded_as>acd_product_xss</decoded_as>
+    <description>Web attack: XSS attempt detected.</description>
+    <group>web_attack,xss,attack,</group>
+  </rule>
+</group>
+
+<group name="acd_lab,lateral_movement,exfiltration,">
+  <rule id="100301" level="10">
+    <decoded_as>acd_cred_reuse</decoded_as>
+    <description>Dependency abuse or credential reuse detected.</description>
+    <group>credential_abuse,attack,</group>
+  </rule>
+  <rule id="100302" level="11">
+    <decoded_as>acd_lateral</decoded_as>
+    <description>Unauthorized internal admin access.</description>
+    <group>lateral_movement,attack,</group>
+  </rule>
+  <rule id="100303" level="12">
+    <decoded_as>acd_exfil</decoded_as>
+    <description>Data exfiltration volume anomaly.</description>
+    <group>exfiltration,attack,</group>
+  </rule>
+</group>
+
+<group name="acd_lab,recon,">
+  <rule id="100201" level="8">
+    <match>nmap|masscan|Nikto|sqlmap</match>
+    <description>Reconnaissance tool signature detected.</description>
+    <group>recon,port_scan,attack,</group>
+  </rule>
+  <rule id="100202" level="10" frequency="50" timeframe="30">
+    <if_matched_sid>100201</if_matched_sid>
+    <same_srcip/>
+    <description>Sustained reconnaissance from single IP.</description>
+    <group>recon,port_scan,attack,</group>
+  </rule>
+</group>
