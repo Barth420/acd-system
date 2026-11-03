@@ -92,6 +92,18 @@ class LocalStack:
         st["version"] = st.get("version", 0) + 1
         cs.write_state(self.control, st)
 
+    def start_controller(self) -> str:
+        """Also run the controller (real code, docker off, no postgres/redis probes) against this stack. Returns its URL."""
+        port = free_port()
+        env = {**os.environ, "PYTHONPATH": f"{HIER / 'shared'}:{HIER}", "CONTROL_STATE": str(self.control), "GATEWAY_URL": self.gateway,
+               "ACD_DOCKER": "off", "ACD_NO_INFRA_PROBE": "1", "LOG_ROOT": str(self.logs),
+               "ALERT_URLS": os.getenv("ALERT_URLS", ""), **{f"SERVICE_URL_{s.upper()}": self.url(s) for s in MODULES}}
+        self.procs.append(subprocess.Popen([sys.executable, "-m", "uvicorn", "controller.app:app", "--port", str(port), "--log-level", "warning"],
+                                           cwd=HIER, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        self.controller = f"http://127.0.0.1:{port}"
+        self._wait(self.controller + "/topology")
+        return self.controller
+
     def stop(self) -> None:
         for p in self.procs:
             p.terminate()

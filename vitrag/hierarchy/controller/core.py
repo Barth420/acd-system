@@ -41,6 +41,8 @@ def make_direct_probe(gateway_url: str) -> Callable[[str], Optional[bool]]:
             if service == "nginx":
                 return requests.get(gateway_url + "/healthz", timeout=2).status_code == 200
             if service in ("database", "cache"):
+                if os.getenv("ACD_NO_INFRA_PROBE"):
+                    return None                       # local-process runs have no postgres/redis process to probe
                 host = os.getenv(f"SERVICE_HOST_{service.upper()}", service)
                 port = int(os.getenv(f"SERVICE_PORT_{service.upper()}", cs.PORTS[service]))
                 with socket.create_connection((host, port), timeout=2):

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACD Lab Console</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<header>
+  <h1>ACD Lab Console <span class="sub">hierarchy lab · controller</span></h1>
+  <div class="row">
+    <span id="status" class="pill">connecting…</span>
+    <label>traffic <input id="rate" type="number" min="1" max="50" value="5" aria-label="requests per second"> /s</label>
+    <button id="traffic-on">Start</button><button id="traffic-off">Stop</button>
+    <button id="reset" class="danger">Reset lab</button>
+  </div>
+</header>
+<main>
+  <section class="card wide">
+    <h2>Hierarchy <span class="hint">tier 0 at the top; arrows point at the dependency; click a service to control it</span></h2>
+    <svg id="graph" viewBox="0 0 760 340" role="img" aria-label="Service hierarchy with live modes"></svg>
+    <div id="legend" class="legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Availability</h2>
+    <div id="overall" class="big">–</div>
+    <table id="journeys"></table>
+    <h3>Services (direct probes)</h3>
+    <div id="services" class="chips"></div>
+  </section>
+
+  <section class="card">
+    <h2>Actuators</h2>
+    <div class="row"><label>service <select id="svc"></select></label>
+      <span id="svc-now" class="small"></span></div>
+    <div id="modes" class="row"></div>
+    <div class="row"><button id="rotate">Rotate credentials</button></div>
+    <h3>Edges</h3>
+    <div class="row">
+      <label>from <select id="e-from"></select></label><label>to <select id="e-to"></select></label>
+      <button id="cut" class="danger">Cut</button><button id="restore">Restore</button>
+    </div>
+    <div id="cuts" class="small"></div>
+    <div id="msg" class="small" role="status"></div>
+  </section>
+
+  <section class="card wide">
+    <h2>Scenarios <span class="hint">scripted multi-stage runs with ground truth</span></h2>
+    <div class="row">
+      <select id="scenario"></select>
+      <label>seed <input id="seed" type="number" placeholder="random" aria-label="seed"></label>
+      <button id="run" class="primary">Run</button><button id="stop">Stop</button>
+      <span id="run-info" class="small"></span>
+    </div>
+    <div id="scn-desc" class="small"></div>
+    <table id="steps"></table>
+    <div id="gt-summary" class="small"></div>
+  </section>
+
+  <section class="card wide">
+    <h2>Actions log <span class="hint">append-only; newest first</span></h2>
+    <table id="actions"></table>
+  </section>
+</main>
+<script src="/ui/app.js"></script>
+</body>
+</html>

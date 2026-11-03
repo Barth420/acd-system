@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -70,6 +71,19 @@ def create_app(lab: Optional[Lab] = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, e: RequestValidationError):
         return JSONResponse({"error": "invalid request: " + "; ".join(f"{'.'.join(map(str, x['loc'][1:]))}: {x['msg']}" for x in e.errors())}, status_code=422)
+
+    ui_dir = Path(__file__).resolve().parent / "ui"
+    no_store = {"Cache-Control": "no-store"}        # NB: no X-Frame-Options / frame-ancestors header: the main dashboard embeds this page
+
+    @app.get("/ui", include_in_schema=False)
+    def ui_index():
+        return FileResponse(ui_dir / "index.html", headers=no_store)
+
+    @app.get("/ui/{name}", include_in_schema=False)
+    def ui_asset(name: str):
+        if name not in ("app.js", "style.css"):
+            raise StarletteHTTPException(404, "not found")
+        return FileResponse(ui_dir / name, headers=no_store)
 
     @app.get("/topology")
     def topology():
