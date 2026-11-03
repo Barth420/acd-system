@@ -1,0 +1,96 @@
+# ACD hierarchy lab: 8 services of contract A, one docker network per tier, Wazuh behind the `wazuh` profile.
+# Do NOT run together with the old lab (project acd-phase1): scripts/up.sh refuses to start if it is up.
+name: acd-hierarchy
+
+x-service: &svc
+  build: { context: ., dockerfile: services/Dockerfile }
+  image: acd-h-service:latest
+  restart: unless-stopped
+  mem_limit: 128m
+  volumes: [ "control:/control:ro", "app_logs:/var/log/acd" ]
+  environment: &svc-env
+    CONTROL_STATE: /control/state.json
+    LOG_ROOT: /var/log/acd
+    DATABASE_URL: postgresql://appuser:weakpass123@database:5432/acd_lab
+    CACHE_URL: redis://cache:6379/0
+
+networks:
+  net_t0: { name: acd-h-net-t0, internal: true }      # gateway <-> tier-1
+  net_t1: { name: acd-h-net-t1, internal: true }      # tier-1 peers
+  net_t2: { name: acd-h-net-t2, internal: true }      # tier-1 <-> tier-2 (data)
+  ctl_net: { name: acd-h-ctl-net }                     # controller / alert sink / forwarder: reachable from the host
+  attacker_net:                                        # attacker containers (added with the scenario milestone)
+    name: acd-h-attacker-net
+    ipam: { config: [ { subnet: 172.30.9.0/24 } ] }
+
+volumes:
+  control:
+  app_logs:
+  pg_data:
+
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: acd-h-database
+    restart: unless-stopped
+    mem_limit: 256m
+    environment: { POSTGRES_USER: appuser, POSTGRES_PASSWORD: weakpass123, POSTGRES_DB: acd_lab }
+    volumes: [ "pg_data:/var/lib/postgresql/data", "./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" ]
+    networks: [ net_t2 ]                                # never published to the host
+
+  cache:
+    image: redis:7-alpine
+    container_name: acd-h-cache
+    restart: unless-stopped
+    mem_limit: 64m
+    networks: [ net_t2 ]                                # never published to the host
+
+  queue:
+    <<: *svc
+    container_name: acd-h-queue
+    command: python -m svc.queue_svc
+    environment: { <<: *svc-env, SERVICE_NAME: queue, PORT: "5004", DATABASE_URL: "postgresql://queue_worker:worker123@database:5432/acd_lab" }
+    networks: [ net_t2 ]                                # never published to the host
+
+  auth_api:
+    <<: *svc
+    container_name: acd-h-auth_api
+    command: python -m svc.auth_api
+    environment: { <<: *svc-env, SERVICE_NAME: auth_api, PORT: "5000" }
+    networks: [ net_t0, net_t1, net_t2 ]
+
+  product_api:
+    <<: *svc
+    container_name: acd-h-product_api
+    command: python -m svc.product_api
+    environment: { <<: *svc-env, SERVICE_NAME: product_api, PORT: "5001" }
+    networks: [ net_t0, net_t1, net_t2 ]
+
+  order_api:
+    <<: *svc
+    container_name: acd-h-order_api
+    command: python -m svc.order_api
+    environment: { <<: *svc-env, SERVICE_NAME: order_api, PORT: "5002" }
+    networks: [ net_t0, net_t1, net_t2 ]
+
+  search_api:
+    <<: *svc
+    container_name: acd-h-search_api
+    command: python -m svc.search_api
+    environment: { <<: *svc-env, SERVICE_NAME: search_api, PORT: "5003" }
+    networks: [ net_t0, net_t1, net_t2 ]
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: acd-h-nginx
+    restart: unless-stopped
+    mem_limit: 64m
+    ports: [ "127.0.0.1:8080:80" ]                      # the only application port published to the host
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/proxy_common.conf:/etc/nginx/proxy_common.conf:ro
+      - control:/control:ro
+      - app_logs:/var/log/acd
+    # wait for the controller to write the first generated include, then run in the foreground
+    entrypoint: [ "/bin/sh", "-c", "mkdir -p /var/log/acd/nginx; until [ -f /control/gateway_http.conf ]; do sleep 1; done; exec nginx -g 'daemon off;'" ]
+    networks: [ attacker_net, net_t0 ]

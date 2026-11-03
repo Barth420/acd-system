@@ -1,0 +1,12 @@
+{
+  "services": [
+    {"name": "nginx",       "tier": 0, "port": 80,   "sensitivity": "medium",   "exposure": "external", "depends_on": ["auth_api", "product_api", "order_api", "search_api"]},
+    {"name": "auth_api",    "tier": 1, "port": 5000, "sensitivity": "critical", "exposure": "external", "depends_on": ["database", "cache"]},
+    {"name": "product_api", "tier": 1, "port": 5001, "sensitivity": "high",     "exposure": "external", "depends_on": ["database", "auth_api"]},
+    {"name": "order_api",   "tier": 1, "port": 5002, "sensitivity": "high",     "exposure": "external", "depends_on": ["database", "auth_api", "queue"]},
+    {"name": "search_api",  "tier": 1, "port": 5003, "sensitivity": "medium",   "exposure": "external", "depends_on": ["cache"]},
+    {"name": "database",    "tier": 2, "port": 5432, "sensitivity": "critical", "exposure": "internal", "depends_on": []},
+    {"name": "cache",       "tier": 2, "port": 6379, "sensitivity": "medium",   "exposure": "internal", "depends_on": []},
+    {"name": "queue",       "tier": 2, "port": 5004, "sensitivity": "low",      "exposure": "internal", "depends_on": []}
+  ]
+}
