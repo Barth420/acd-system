@@ -99,12 +99,14 @@ services:
     mem_limit: 64m
     ports: [ "127.0.0.1:8080:80" ]                      # the only application port published to the host
     volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./gateway/proxy_common.conf:/etc/nginx/proxy_common.conf:ro
+      # the whole directory, not individual files: single-file bind mounts are known to go stale on
+      # Docker Desktop + WSL2 after the host file changes underneath the container (a directory mount doesn't
+      # have this problem) -- see docs/vitrag/DECISIONS.md.
+      - ./gateway:/etc/nginx/custom:ro
       - control:/control:ro
       - app_logs:/var/log/acd
-    # wait for the controller to write the first generated include, then run in the foreground
-    entrypoint: [ "/bin/sh", "-c", "mkdir -p /var/log/acd/nginx; until [ -f /control/gateway_http.conf ]; do sleep 1; done; exec nginx -g 'daemon off;'" ]
+    # wait for the controller to write the first generated include, then run in the foreground with our config
+    entrypoint: [ "/bin/sh", "-c", "mkdir -p /var/log/acd/nginx; until [ -f /control/gateway_http.conf ]; do sleep 1; done; exec nginx -c /etc/nginx/custom/nginx.conf -g 'daemon off;'" ]
     networks: [ attacker_net, net_t0 ]
 
   controller:

@@ -99,3 +99,13 @@
 25. Seeds (`random.Random(seed)`) control step-timing jitter only (0.05-1.8 s ranges, chosen by me, not measured);
     the attack logic and payloads are fixed per scenario. `test_seed_controls_jitter_deterministically` checks same
     seed -> same timing and outcomes.
+
+## Post-merge fix: Docker Desktop + WSL2 bind-mount quirk
+26. Found by the user running the real stack: Docker Desktop on WSL2 can leave a *single-file* bind mount
+    (`./gateway/nginx.conf:/etc/nginx/nginx.conf:ro`) pointing at a stale internal path after the host file
+    changes underneath it ("no such file or directory" from `runc`, container stuck `Restarting`), and a plain
+    `docker compose restart` does not always re-establish it. Switched the nginx service to bind-mount the whole
+    `gateway/` directory to `/etc/nginx/custom` instead (directory mounts don't have this problem) and launch
+    nginx with `-c /etc/nginx/custom/nginx.conf`. Unverified beyond the user's one report; if it recurs, the
+    fallback is `docker compose up -d --force-recreate nginx`, or (rare) `wsl --shutdown` from Windows PowerShell
+    to reset the WSL VM.
