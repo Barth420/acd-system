@@ -1,0 +1,25 @@
+# Private/raw corpus and generated data
+data/raw/
+data/processed/*.jsonl
+data/processed/*.tmp
+data/processed/*.jsonl.tmp
+
+# Private model artifacts and checkpoints
+artifacts/
+checkpoints/
+outputs/
+logs/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Local caches and environments
+hf_cache/
+.cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
