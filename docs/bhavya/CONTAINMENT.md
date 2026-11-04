@@ -46,11 +46,15 @@ developer-chosen default, not a measured or trained value**, and the rationale t
 - `template`: a deterministic sentence built from the same facts the planner used. **Not a model.** Always
   available, labelled `[non-LLM]` in the UI.
 - `hf`: the real fine-tuned adapter, loaded lazily (torch/transformers/peft are never imported unless this
-  backend is selected). Needs `ACD_LLM_ADAPTER_DIR` pointed at an extracted adapter package (same shape as
-  `qwen_stage1/SETUP.md`: an `adapter/` and `tokenizer/` folder) and `ACD_LLM_BASE_MODEL` (default
+  backend is selected). Needs `ACD_LLM_ADAPTER_DIR` pointed at an extracted adapter package (same shape the
+  handover guide describes: an `adapter/` and `tokenizer/` folder) and `ACD_LLM_BASE_MODEL` (default
   `Qwen/Qwen3-4B-Base`). **The trained weights are not part of this repository** — they exist only wherever
   they were originally trained; point `ACD_LLM_ADAPTER_DIR` at wherever you've put them. If the directory isn't
   there, or torch isn't installed, it says exactly why instead of guessing.
+  On a CUDA GPU it loads with the same 4-bit NF4 quantization the adapter was trained with (per the handover
+  guide's own warning that an unquantized float16 load may not fit a 16 GB card) — needs `bitsandbytes`
+  installed; set `ACD_LLM_4BIT=0` to force an unquantized load on a bigger GPU instead. CPU has no 4-bit path
+  (bitsandbytes 4-bit is CUDA-only) and always loads unquantized, which the guide itself flags as possibly slow.
 - `off`: the dashboard's "What the LLM said" section is omitted entirely.
 
 **The LLM never decides anything.** The mode and edge cuts always come from the deterministic planner above;

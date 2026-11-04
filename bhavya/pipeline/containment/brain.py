@@ -57,6 +57,7 @@ class HfBackend:
         self._model = None
         self._tokenizer = None
         self._load_error: Optional[str] = None
+        self._quantized = False
         self.base_model = os.getenv("ACD_LLM_BASE_MODEL", "Qwen/Qwen3-4B-Base")
         self.adapter_dir = os.getenv("ACD_LLM_ADAPTER_DIR", "")
         self.max_new_tokens = int(os.getenv("ACD_LLM_MAX_NEW_TOKENS", "80"))
@@ -83,13 +84,27 @@ class HfBackend:
             except ImportError as e:
                 self._load_error = f"torch/transformers/peft not installed in this environment ({e})"
                 return self._load_error
+            # The handover guide (qwen_stage1/SETUP.md, "Step 3") is explicit that an unquantized float16 load
+            # of the 4B base model may not fit a 16 GB GPU, and warns against assuming it will. Default to the
+            # same 4-bit NF4 quantization the adapter was TRAINED with whenever CUDA is available (set
+            # ACD_LLM_4BIT=0 to force an unquantized load instead, e.g. for a bigger GPU). bitsandbytes 4-bit is
+            # a CUDA kernel, not usable on CPU, so a CPU box always falls back to an unquantized load (the
+            # guide's own fallback: "CPU inference may be possible but can be slow").
+            use_4bit = torch.cuda.is_available() and os.getenv("ACD_LLM_4BIT", "1") != "0"
             try:
                 tok = AutoTokenizer.from_pretrained(str(p / "tokenizer"))
-                base = AutoModelForCausalLM.from_pretrained(self.base_model, torch_dtype="auto",
-                                                            device_map="auto" if torch.cuda.is_available() else None)
+                if use_4bit:
+                    from transformers import BitsAndBytesConfig
+                    bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                                             bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True)
+                    base = AutoModelForCausalLM.from_pretrained(self.base_model, quantization_config=bnb, device_map="auto")
+                else:
+                    base = AutoModelForCausalLM.from_pretrained(self.base_model, torch_dtype="auto",
+                                                                device_map="auto" if torch.cuda.is_available() else None)
                 self._tokenizer = tok
                 self._model = PeftModel.from_pretrained(base, str(p / "adapter"))
                 self._model.eval()
+                self._quantized = use_4bit
             except Exception as e:  # noqa: BLE001 — any load failure is reported, never raised into the request path
                 self._load_error = f"{e.__class__.__name__}: {e}"
                 self._model = None
@@ -116,7 +131,8 @@ class HfBackend:
             return {"backend": self.name, "available": False, "reason": f"generation failed: {e.__class__.__name__}: {e}",
                    "text": _fact_sentence(service, attack_type, severity, source_ip, mode)}
         return {"backend": self.name, "available": True, "text": text.strip(),
-               "latency_s": round(time.time() - t0, 2), "model": f"{self.base_model} + {Path(self.adapter_dir).name}",
+               "latency_s": round(time.time() - t0, 2),
+               "model": f"{self.base_model} + {Path(self.adapter_dir).name}" + (" (4-bit NF4)" if self._quantized else " (unquantized)"),
                "caveat": "Domain-adapted language model, NOT a trained attack classifier. Read as context, not a verdict."}
 
 

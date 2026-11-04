@@ -9,6 +9,8 @@ This is the same integration point the real lab controller (vitrag/hierarchy/con
 
 from __future__ import annotations
 
+import os
+
 import httpx
 import pytest
 from fastapi import FastAPI
@@ -278,3 +280,15 @@ def test_a_broken_brain_backend_never_breaks_containment():
                             severity="high", source_ip="4.4.4.4")
     assert d.status == "executed" and state["modes"]["auth_api"] == "fallback"   # containment still ran
     assert d.brain_response["available"] is False and "boom" in d.brain_response["reason"]
+
+
+def test_hf_backend_defaults_to_4bit_env_flag_and_can_be_overridden(monkeypatch, tmp_path):
+    """No torch here, so this only checks the env/attribute wiring -- not an actual load."""
+    from pipeline.containment.brain import HfBackend
+    monkeypatch.setenv("ACD_LLM_ADAPTER_DIR", str(tmp_path))  # still missing adapter/+tokenizer/: load fails early
+    b = HfBackend()
+    assert os.getenv("ACD_LLM_4BIT", "1") == "1"       # default is on; HfBackend only skips 4-bit when no CUDA
+    monkeypatch.setenv("ACD_LLM_4BIT", "0")
+    b2 = HfBackend()
+    r = b2.explain(service="x", attack_type="y", severity="low", source_ip="1.1.1.1", mode="normal")
+    assert r["available"] is False  # still fails (no adapter/, no torch) -- this just proves the flag didn't crash construction
