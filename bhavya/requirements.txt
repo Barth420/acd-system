@@ -16,4 +16,9 @@ networkx>=3.2
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 pytest>=8.0.0
-httpx>=0.27.0  # FastAPI TestClient backend
+httpx>=0.27.0  # FastAPI TestClient backend, and the containment planner's live calls to Vitrag's lab controller
+
+# ── Optional: real LLM brain backend (ACD_BRAIN_BACKEND=hf) ──────────────────
+# Not required to run the pipeline. Only needed if you actually have the trained adapter
+# (see qwen_stage1/SETUP.md) and set ACD_LLM_ADAPTER_DIR to it.
+#   pip install torch transformers peft bitsandbytes

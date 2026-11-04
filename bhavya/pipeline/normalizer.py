@@ -92,11 +92,25 @@ BRUTE_FORCE_HINTS = re.compile(
 )
 
 
+# Vitrag's hierarchy-lab forwarder (vitrag/hierarchy/forwarder/rules.py) emits these exact ids for contract D;
+# trust them outright, before the generic keyword/range guesses below (which exist for Wazuh's own built-in rules
+# and for the old 4-service lab's ids, e.g. 5712 / 31103 / 40101).
+HIERARCHY_RULE_IDS: dict[int, AttackType] = {
+    100710: "brute_force", 100711: "brute_force", 100712: "brute_force",
+    100103: "sql_injection", 100105: "sql_injection", 100106: "xss",
+    100201: "port_scan", 100202: "port_scan",
+    100301: "credential_abuse", 100302: "lateral_movement", 100303: "data_exfiltration",
+}
+
+
 def classify_attack(rule_id: Optional[int], rule_desc: str, payload: str) -> AttackType:
     """
     Best-effort attack classification.
-    Order: explicit keywords > rule_id ranges > unknown.
+    Order: hierarchy-lab rule id (exact) > explicit keywords > rule_id ranges > unknown.
     """
+    if rule_id in HIERARCHY_RULE_IDS:
+        return HIERARCHY_RULE_IDS[rule_id]
+
     haystack = f"{rule_desc} {payload}"
 
     if SQL_KEYWORDS.search(haystack):
@@ -131,6 +145,10 @@ def classify_attack(rule_id: Optional[int], rule_desc: str, payload: str) -> Att
 PORT_TO_SERVICE: dict[int, ServiceName] = {
     5000: "auth_api",
     5001: "product_api",
+    5002: "order_api",
+    5003: "search_api",
+    5004: "queue",
+    6379: "cache",
     5432: "database",
     3306: "database",
     80: "nginx",

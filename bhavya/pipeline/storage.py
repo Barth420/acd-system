@@ -61,6 +61,20 @@ class IncidentRow(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
+class DecisionRow(Base):
+    __tablename__ = "containment_decisions"
+
+    decision_id = Column(String, primary_key=True)
+    incident_id = Column(String, index=True, nullable=False)
+    compromised_service = Column(String, index=True, nullable=False)
+    attack_type = Column(String, index=True, nullable=False)
+    severity = Column(String, nullable=False)
+    mode = Column(String, nullable=False)
+    status = Column(String, index=True, nullable=False)
+    payload_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 def init_db() -> None:
     Base.metadata.create_all(ENGINE)
     logger.info(f"DB initialized at {DB_PATH}")
@@ -121,3 +135,30 @@ def get_incident(incident_id: str) -> Optional[dict]:
 def count_incidents() -> int:
     with Session(ENGINE) as s:
         return s.query(IncidentRow).count()
+
+
+def save_decision(decision: dict) -> None:
+    with Session(ENGINE) as s:
+        row = s.get(DecisionRow, decision["decision_id"])
+        if row is None:
+            row = DecisionRow(decision_id=decision["decision_id"], incident_id=decision["incident_id"],
+                              compromised_service=decision["compromised_service"], attack_type=decision["attack_type"],
+                              severity=decision["severity"], mode=decision["mode"], status=decision["status"],
+                              payload_json=json.dumps(decision))
+            s.add(row)
+        else:
+            row.status = decision["status"]
+            row.payload_json = json.dumps(decision)
+        s.commit()
+
+
+def list_decisions(limit: int = 100) -> list[dict]:
+    with Session(ENGINE) as s:
+        rows = s.execute(select(DecisionRow).order_by(DecisionRow.created_at.desc()).limit(limit)).scalars().all()
+        return [json.loads(r.payload_json) for r in rows]
+
+
+def get_decision(decision_id: str) -> Optional[dict]:
+    with Session(ENGINE) as s:
+        row = s.get(DecisionRow, decision_id)
+        return json.loads(row.payload_json) if row else None

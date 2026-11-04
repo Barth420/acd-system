@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACD Containment Dashboard</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<header>
+  <h1>ACD <span class="sub">Containment &amp; Forensics</span></h1>
+  <div class="row">
+    <span id="pipe-pill" class="pill">pipeline: …</span>
+    <span id="ctl-pill" class="pill">controller: …</span>
+    <span id="autonomy-pill" class="pill">autonomy: …</span>
+  </div>
+</header>
+<nav id="tabs">
+  <button data-tab="overview" class="active">Overview</button>
+  <button data-tab="containment">Containment</button>
+  <button data-tab="forensics">Forensics</button>
+</nav>
+<main>
+  <section id="tab-overview" class="tab active">
+    <div class="card wide">
+      <h2>Live topology <span class="hint">colour = mode, from the real lab controller; dashed red = cut edge</span></h2>
+      <svg id="graph" viewBox="0 0 760 340" role="img" aria-label="Service dependency graph with live modes"></svg>
+      <div id="legend" class="legend"></div>
+    </div>
+    <div class="card wide">
+      <h2>Recent incidents</h2>
+      <table id="incident-feed"></table>
+    </div>
+  </section>
+
+  <section id="tab-containment" class="tab">
+    <div class="card wide">
+      <h2>Containment decisions <span class="hint">newest first — why each action was taken</span></h2>
+      <div id="decisions"></div>
+    </div>
+  </section>
+
+  <section id="tab-forensics" class="tab">
+    <div class="card wide">
+      <h2>Attack reconstruction <span class="hint">where it started and how it spread, from stored alerts</span></h2>
+      <div class="row">
+        <input id="f-ip" placeholder="filter by source IP (optional)">
+        <button id="f-go">Reconstruct</button>
+      </div>
+      <div id="f-summary" class="small"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Path overlay <span class="hint">dashed = inferred (not a direct dependency), solid = observed</span></h2>
+        <svg id="f-graph" viewBox="0 0 760 340" role="img" aria-label="Reconstructed attack path"></svg>
+      </div>
+      <div class="card">
+        <h2>Timeline</h2>
+        <table id="f-timeline"></table>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/ui/app.js"></script>
+</body>
+</html>

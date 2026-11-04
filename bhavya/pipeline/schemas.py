@@ -57,8 +57,14 @@ class RawAlert(BaseModel):
 # This MUST match acd-system-main/schemas/input_schema.json exactly.
 # Field names, enums, types — all locked.
 
-ServiceName = Literal["auth_api", "product_api", "database", "nginx", "unknown"]
-AttackType = Literal["brute_force", "sql_injection", "port_scan", "xss", "unknown"]
+ServiceName = Literal[
+    "auth_api", "product_api", "order_api", "search_api",
+    "database", "cache", "queue", "nginx", "unknown",
+]  # extended to the full 8-service lab (contract A); was the 4-service Phase-1 subset
+AttackType = Literal[
+    "brute_force", "sql_injection", "port_scan", "xss",
+    "credential_abuse", "lateral_movement", "data_exfiltration", "unknown",
+]  # credential_abuse/lateral_movement/data_exfiltration added for contract D rule ids 100301-100303
 Severity = Literal["low", "medium", "high", "critical"]
 
 
