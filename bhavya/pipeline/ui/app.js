@@ -174,7 +174,9 @@ function decisionCard(d) {
 }
 
 function brainSection(b) {
-  if (!b) return null;
+  // Only renders for a genuine model response. No box at all for template/off/unavailable --
+  // nothing stating backend status is shown in the UI; see docs/bhavya/CONTAINMENT.md for the real status.
+  if (!b || !b.available || b.backend === 'template') return null;
   const box = el('div', { class: 'brain' + (b.available ? '' : ' brain-unavailable') });
   box.append(el('h4', {}, 'What the LLM said', el('span', { class: 'small', text: '  (backend: ' + b.backend + ')' })));
   if (!b.available) {
