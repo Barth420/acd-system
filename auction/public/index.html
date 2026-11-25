@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DTCL Season 4 · Player Auction</title>
+<meta name="theme-color" content="#0a0f19">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark">DT</span>
+    <div class="brand-text">
+      <b>Dhandhar Turf Cricket League</b>
+      <small>Season 4 &middot; Player Auction</small>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="auction">Auction</button>
+    <button data-tab="teams">Teams</button>
+    <button data-tab="players">Players</button>
+  </nav>
+  <div class="top-right">
+    <span class="role-tag admin-only">Auctioneer</span>
+    <span class="live" id="live"><i></i><span>Connecting</span></span>
+    <div class="seg" id="leagueSeg">
+      <button data-league="men">Men</button>
+      <button data-league="women">Women</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ============ AUCTION ============ -->
+  <section id="view-auction">
+
+    <div class="admin-bar card admin-only" id="adminBar">
+      <div class="ab-group">
+        <span class="eyebrow">Draw from</span>
+        <div class="seg seg-sm" id="abCats"></div>
+      </div>
+      <button class="btn primary" id="spinBtn">Spin the wheel</button>
+      <span class="ab-spacer"></span>
+      <button class="btn ghost" id="undoSale">Undo last sale</button>
+      <button class="btn ghost" id="openSettings">Rules &amp; purse</button>
+      <button class="btn ghost danger-text" id="openReset">Reset</button>
+    </div>
+
+    <div class="layout">
+      <div class="stage card">
+        <div class="wheel-col">
+          <div class="wheel-wrap">
+            <canvas id="wheel" width="640" height="640" aria-label="Player wheel"></canvas>
+          </div>
+          <div class="wheel-cap" id="wheelCap"></div>
+        </div>
+
+        <div class="player-col" id="player">
+          <div class="state-msg" id="pEmpty"></div>
+
+          <div class="onblock" id="pBlock" hidden>
+            <div class="pb-top">
+              <div class="photo" id="pPhoto"></div>
+              <div class="pb-meta">
+                <span class="badge" id="pCat"></span>
+                <h2 id="pName"></h2>
+                <div class="pb-sub" id="pSub"></div>
+                <div class="pb-base"><span>Base price</span><b id="pBase"></b></div>
+              </div>
+            </div>
+
+            <div class="bidbox">
+              <div class="eyebrow">Current bid</div>
+              <div class="price" id="bPrice"></div>
+              <div class="leader" id="bLeader"></div>
+              <ul class="bid-hist" id="bHist"></ul>
+            </div>
+
+            <div class="bid-actions admin-only" id="bActions">
+              <div class="inc-row">
+                <span class="eyebrow">Raise by</span>
+                <div class="seg seg-sm" id="incSeg"></div>
+              </div>
+              <div class="act-row">
+                <button class="btn sold" id="soldBtn">Sold</button>
+                <button class="btn unsold" id="unsoldBtn">Unsold</button>
+                <button class="btn ghost" id="unbidBtn">Undo bid</button>
+                <button class="btn ghost" id="withdrawBtn">Back to wheel</button>
+              </div>
+              <p class="hint">Click a team below to place its bid.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="card pool">
+          <div class="card-h">
+            <h3>Still to be auctioned</h3>
+            <span class="stat-line" id="poolStats"></span>
+          </div>
+          <div class="pool-tabs" id="poolTabs"></div>
+          <div class="pool-list" id="poolList"></div>
+        </div>
+        <div class="card recent">
+          <div class="card-h"><h3>Latest results</h3></div>
+          <ul class="recent-list" id="recent"></ul>
+        </div>
+      </aside>
+    </div>
+
+    <div class="sec-h">
+      <h3>Teams</h3>
+      <span class="sec-note" id="tilesNote"></span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <!-- ============ TEAMS ============ -->
+  <section id="view-teams" hidden>
+    <div class="teams-grid" id="teamsGrid"></div>
+  </section>
+
+  <!-- ============ PLAYERS ============ -->
+  <section id="view-players" hidden>
+    <div class="pl-controls card">
+      <input type="search" id="plSearch" placeholder="Search players" autocomplete="off">
+      <div class="chips" id="plCats"></div>
+      <div class="chips" id="plStatus"></div>
+    </div>
+    <div class="card pl-card">
+      <div class="pl-head"><span>Player</span><span>Category</span><span>Role</span><span class="r">Points</span><span>Status</span></div>
+      <div id="plList"></div>
+    </div>
+  </section>
+</main>
+
+<div id="overlay" class="overlay" hidden></div>
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<canvas id="confetti"></canvas>
+
+<script src="/rules.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
